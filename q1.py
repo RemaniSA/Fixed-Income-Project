@@ -104,11 +104,11 @@ floor = bond_characteristics['Floor']
 cap = bond_characteristics['Cap']
 
 # Euribor range (0% to 5%)
-euribor_range = np.arange(0.0, 0.0501, 0.001)  # from 0% to 5% in 0.1% steps
+euribor_range = np.arange(0, 0.0501, 0.001)
 
 # Coupon payoff function
 def coupon_payoff(r, floor, cap):
-    return np.minimum(np.maximum(r, floor), cap)
+    return np.min(np.max(r, floor), cap)
 
 coupon_values = coupon_payoff(euribor_range, floor, cap)
 
