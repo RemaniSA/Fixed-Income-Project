@@ -108,7 +108,7 @@ euribor_range = np.arange(0, 0.0501, 0.001)
 
 # Coupon payoff function
 def coupon_payoff(r, floor, cap):
-    return np.min(np.max(r, floor), cap)
+    return np.minimum(np.maximum(r, floor), cap)
 
 coupon_values = coupon_payoff(euribor_range, floor, cap)
 
