@@ -32,7 +32,7 @@ bond_characteristics = {
     'Listing': 'EuroTLX Listing'
 }
 
-def get_next_payment_date(trade_date: datetime, payment_dates: list[str]) -> datetime:
+def get_next_payment_date(trade_date, payment_dates):
     """
     Given a trade date (datetime) and a list of interest payment dates (as 'DD/MM' strings),
     return the next interest payment date as a datetime object.
@@ -55,7 +55,7 @@ def get_next_payment_date(trade_date: datetime, payment_dates: list[str]) -> dat
 def coupon_payoff(r, floor, cap):
     return np.minimum(np.maximum(r, floor), cap)
 
-if __name__ == "__main__":
+def main():
     # -------------------
     # Key Dates
     # -------------------
@@ -107,3 +107,6 @@ if __name__ == "__main__":
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+if __name__ == "__main__":
+    main()
