@@ -1,13 +1,38 @@
-#%%
 import os
 import pandas as pd
 from datetime import datetime
 import matplotlib.pyplot as plt
+import numpy as np
 
 from q1 import bond_characteristics
 
 ROOT_PATH = os.path.dirname(__file__)
 euribor_rates_file_path = ROOT_PATH + '/datasets/HistoricalEuribor.csv'
+holidays_file_path = ROOT_PATH + '/datasets/Holidays.csv'
+
+
+def modified_following_business_date(end_date, holidays):
+    """
+    Adjust a date according to the modified following business day convention.
+    If pushing to the next business day changes the month, go to the previous one.
+
+    Parameters:
+    - end_date: datetime.date or string
+    - holidays: list of datetime.date or strings
+
+    Returns:
+    - datetime.date
+    """
+    end_date = np.datetime64(pd.to_datetime(end_date).date())
+    holidays = np.array(pd.to_datetime(holidays).date, dtype='datetime64[D]')
+
+    foll_bus_date = np.busday_offset(end_date - 1, 1, holidays=holidays)
+    prev_bus_date = np.busday_offset(end_date + 1, -1, holidays=holidays)
+
+    if pd.to_datetime(foll_bus_date).month == pd.to_datetime(end_date).month:
+        return pd.to_datetime(foll_bus_date).date()
+    else:
+        return pd.to_datetime(prev_bus_date).date()
 
 
 def load_and_clean_rates(filepath):
@@ -39,12 +64,8 @@ def is_end_of_month(date):
     return (date + pd.DateOffset(days=1)).month != date.month
 
 
-def adjust_eom(date):
-    if is_end_of_month(date):
-        date = adjust_for_weekend(date)
-    else:
-        date = adjust_for_weekend(date)
-    return date
+def adjust_eom(date, holidays):
+    return pd.to_datetime(modified_following_business_date(date, holidays))
 
 
 def find_reset_date(start_date, business_days_before=2):
@@ -77,6 +98,14 @@ def build_coupon_schedule(coupon_dates):
 
 def main():
     df_rates = load_and_clean_rates(euribor_rates_file_path)
+    df_holidays = pd.read_csv(holidays_file_path, parse_dates=["Date"])
+    # Print type of df_holidays["Date"] columns
+    # df_holidays.set_index("Date", inplace=True)
+    print(df_holidays["Date"].dtype)
+    df_holidays["Date"] = pd.to_datetime(df_holidays["Date"])
+    print(df_holidays.head())
+    # holidays = pd.to_datetime(df_holidays["Date"]).dt.date.tolist()  # Convert holidays to a list of dates
+    # print(holidays)
 
     start_date = datetime(2022, 7, 29)
     current_date = datetime.now()
@@ -85,22 +114,23 @@ def main():
     coupon_dates = generate_coupon_dates(start_date, current_date, frequency_months)
     df_schedule = build_coupon_schedule(coupon_dates)
 
-    df_schedule["start_date"] = df_schedule["start_date_unadj"].apply(adjust_eom)
-    df_schedule["end_date"] = df_schedule["end_date_unadj"].apply(adjust_eom)
+    # Use modified_following_business_date for start_date and end_date adjustments
+    df_schedule["start_date"] = df_schedule["start_date_unadj"].apply(lambda date: modified_following_business_date(date, holidays))
+    df_schedule["end_date"] = df_schedule["end_date_unadj"].apply(lambda date: modified_following_business_date(date, holidays))
 
     df_schedule["reset_date"] = df_schedule["start_date"].apply(find_reset_date)
     df_schedule["reference_rate"] = df_schedule["reset_date"].apply(lambda d: get_reference_rate(d, df_rates))
 
     df_schedule["coupon_rate"] = df_schedule["reference_rate"].clip(
-        lower=bond_characteristics["Floor"] * 100,
-        upper=bond_characteristics["Cap"] * 100
+        lower=bond_characteristics["Floor"],
+        upper=bond_characteristics["Cap"]
     )
 
     notional = bond_characteristics["Nominal Value"]
     day_count_fraction = 0.25  # Approximate for quarterly 30/360
 
     df_schedule["coupon_amount"] = (
-        notional * df_schedule["coupon_rate"] * day_count_fraction
+        notional * df_schedule["reference_rate"] * day_count_fraction
     )
 
     final_columns = [
