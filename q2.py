@@ -1,8 +1,6 @@
 #%%
 import os
-import sys
 import pandas as pd
-import numpy as np
 from datetime import datetime
 import matplotlib.pyplot as plt
 
@@ -94,15 +92,15 @@ def main():
     df_schedule["reference_rate"] = df_schedule["reset_date"].apply(lambda d: get_reference_rate(d, df_rates))
 
     df_schedule["coupon_rate"] = df_schedule["reference_rate"].clip(
-        lower=bond_characteristics["Floor"]*100,
-        upper=bond_characteristics["Cap"]*100
+        lower=bond_characteristics["Floor"] * 100,
+        upper=bond_characteristics["Cap"] * 100
     )
 
     notional = bond_characteristics["Nominal Value"]
     day_count_fraction = 0.25  # Approximate for quarterly 30/360
 
     df_schedule["coupon_amount"] = (
-        notional * df_schedule["reference_rate"] * day_count_fraction
+        notional * df_schedule["coupon_rate"] * day_count_fraction
     )
 
     final_columns = [
@@ -129,4 +127,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-# %%
