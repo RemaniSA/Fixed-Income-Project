@@ -1,3 +1,4 @@
+#%%
 import os
 import sys
 import pandas as pd
@@ -93,8 +94,8 @@ def main():
     df_schedule["reference_rate"] = df_schedule["reset_date"].apply(lambda d: get_reference_rate(d, df_rates))
 
     df_schedule["coupon_rate"] = df_schedule["reference_rate"].clip(
-        lower=bond_characteristics["Floor"],
-        upper=bond_characteristics["Cap"]
+        lower=bond_characteristics["Floor"]*100,
+        upper=bond_characteristics["Cap"]*100
     )
 
     notional = bond_characteristics["Nominal Value"]
@@ -128,3 +129,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+# %%
