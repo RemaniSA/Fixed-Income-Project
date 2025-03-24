@@ -1,5 +1,6 @@
 import os
 import sys
+from q1 import bond_characteristics
 
 ROOT_PATH = os.path.dirname(__file__)
 
@@ -99,15 +100,14 @@ def get_reference_rate(date):
 
 df_schedule["reference_rate"] = df_schedule["reset_date"].apply(get_reference_rate)
 
-spread = 0.005  # 0.50%
-df_schedule["coupon_rate"] = df_schedule["reference_rate"] + spread
+df_schedule["coupon_rate"] = min(max(df_schedule["reference_rate"], bond_characteristics["Floor"]), bond_characteristics["Cap"])
 
-notional = 1000
+notional = bond_characteristics["Nominal Value"]
 day_count_fraction = 0.25  # approximate for a quarter in 30/360
 
 df_schedule["coupon_amount"] = (
     notional
-    * df_schedule["coupon_rate"]
+    * df_schedule["reference_rate"]
     * day_count_fraction
 )
 
