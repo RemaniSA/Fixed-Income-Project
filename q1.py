@@ -16,7 +16,8 @@ bond_characteristics = {
     'Nominal Value': 1000,
     'Issue Price': 1000,
     'Issue Date': pd.Timestamp('2022-07-29'), 
-    'Maturity Date': pd.Timestamp('2027-07-29'), 
+    'Maturity Date': pd.Timestamp('2027-07-29'),
+    'Trade Date': pd.Timestamp('2024-11-24'), 
     'Coupon Rate': '3M Euribor',
     'Floor': 0.016,  
     'Cap': 0.037, 
@@ -59,7 +60,7 @@ def main():
     # -------------------
     # key dates
     # -------------------
-    trade_date = pd.to_datetime("24/11/2024", dayfirst=True)
+    trade_date = bond_characteristics['Trade Date']
     spot_lag = 2
     value_date = trade_date + pd.Timedelta(days=spot_lag)
 
