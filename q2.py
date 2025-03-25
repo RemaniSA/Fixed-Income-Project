@@ -1,129 +1,136 @@
-#%%
+# %%
 import os
-import pandas as pd
 from datetime import datetime
-import matplotlib.pyplot as plt
 
-from q1 import bond_characteristics
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import QuantLib as ql
+
+from q1 import bond_characteristics  # we need cap, floor, notional, issue date
+
+# ----------------------------
+# 0. file paths and bond details
+# ----------------------------
 
 ROOT_PATH = os.path.dirname(__file__)
-euribor_rates_file_path = ROOT_PATH + '/datasets/HistoricalEuribor.csv'
+euribor_rates_file_path = os.path.join(ROOT_PATH, 'datasets', 'HistoricalEuribor.csv')
+holidays_file_path = os.path.join(ROOT_PATH, 'datasets', 'Holidays.csv')
 
+# ----------------------------
+# 1. load 3MEUR data and holidays
+# ----------------------------
 
-def load_and_clean_rates(filepath):
-    df_rates = pd.read_csv(filepath, delimiter=";", parse_dates=["Date"])
-    df_rates = df_rates.iloc[:, :6]
-    df_rates.columns = ["Date", "1W", "1M", "3M", "6M", "12M"]
-    df_rates.set_index("Date", inplace=True)
-    df_rates[df_rates.columns] = df_rates[df_rates.columns].replace(',', '.', regex=True)
-    df_rates[df_rates.columns] = df_rates[df_rates.columns].astype(float, errors='ignore')
-    return df_rates
+def load_euribor(filepath):
+    df = pd.read_csv(filepath)
+    df.columns = df.columns.str.strip()
+    df = df[["Date", "3M"]]
+    df["Date"] = pd.to_datetime(df["Date"])
+    df.set_index("Date", inplace=True)
+    return df
 
+def load_holidays(filepath):
+    df = pd.read_csv(filepath, parse_dates=["Date"])
+    return [d.date() for d in df["Date"]]
 
-def generate_coupon_dates(start_date, end_date, frequency_months):
-    dates = []
-    d = start_date
-    while d <= end_date:
-        dates.append(d)
-        d += pd.DateOffset(months=frequency_months)
-    return dates
+# ----------------------------
+# 2. helper function that converts QuantLib date into datetime
+# ----------------------------
 
+def ql_to_datetime(qldate):
+    return datetime(qldate.year(), qldate.month(), qldate.dayOfMonth()).date()
 
-def adjust_for_weekend(date):
-    while date.weekday() >= 5:  # 5 = Saturday, 6 = Sunday
-        date += pd.DateOffset(days=1)
-    return date
+# ----------------------------
+# 3. build historical coupon rates and coupons
+# ----------------------------
 
+def build_historical_coupons(euribor_df, holidays):
+    # bond characteristics
+    calendar = ql.TARGET()
+    business_convention = ql.ModifiedFollowing
+    fixing_days = bond_characteristics["Settlement Lag"]
+    frequency = ql.Quarterly
+    notional = bond_characteristics["Nominal Value"]
+    cap = bond_characteristics["Cap"]
+    floor = bond_characteristics["Floor"]
+    start_date = ql.Date(bond_characteristics["Issue Date"].day,
+                         bond_characteristics["Issue Date"].month,
+                         bond_characteristics["Issue Date"].year)
+    end_date = ql.Date(bond_characteristics["Trade Date"].day,
+                       bond_characteristics["Trade Date"].month,
+                       bond_characteristics["Trade Date"].year)
+    # ql.Date.todaysDate()
+    # end_date = ql.Date.todaysDate()
+    day_counter = ql.Actual360()
 
-def is_end_of_month(date):
-    return (date + pd.DateOffset(days=1)).month != date.month
+    # build schedule of coupon payments
+    schedule = ql.Schedule(
+        start_date, end_date,
+        ql.Period(frequency),
+        calendar,
+        business_convention, business_convention,
+        ql.DateGeneration.Forward, False
+    )
 
+    # loop over periods
+    coupon_data = []
+    for i in range(len(schedule) - 1):
+        start = schedule[i]
+        end = schedule[i + 1]
+        reset = calendar.advance(start, -fixing_days, ql.Days)
+        reset_dt = ql_to_datetime(reset)
 
-def adjust_eom(date):
-    if is_end_of_month(date):
-        date = adjust_for_weekend(date)
-    else:
-        date = adjust_for_weekend(date)
-    return date
+        # collect EUR rate as reference rate
+        rate = euribor_df.loc[euribor_df.index == pd.to_datetime(reset_dt), "3M"]
+        if rate.empty:
+            rate = np.nan
+        else:
+            rate = rate.iloc[0] / 100
 
+        # cap/floor adjustment
+        if not np.isnan(rate):
+            capped_rate = max(min(rate, cap), floor)
+        else:
+            capped_rate = np.nan
 
-def find_reset_date(start_date, business_days_before=2):
-    reset_date = start_date
-    days_to_move = business_days_before
-    while days_to_move > 0:
-        reset_date -= pd.DateOffset(days=1)
-        if reset_date.weekday() < 5:
-            days_to_move -= 1
-    return reset_date
+        # year fraction and coupon calc.
+        yf = day_counter.yearFraction(start, end)
+        coupon = notional * capped_rate * yf if not np.isnan(capped_rate) else np.nan
 
-
-def get_reference_rate(date, df_rates):
-    if date in df_rates.index:
-        return df_rates.loc[date, "3M"]
-    else:
-        return None
-
-
-def build_coupon_schedule(coupon_dates):
-    schedule = []
-    for i in range(len(coupon_dates) - 1):
-        schedule.append({
-            "coupon_index": i + 1,
-            "start_date_unadj": coupon_dates[i],
-            "end_date_unadj": coupon_dates[i + 1]
+        coupon_data.append({
+            "Reset Date": reset_dt,
+            "Start Date": ql_to_datetime(start),
+            "End Date": ql_to_datetime(end),
+            "Reference Rate (3M)": rate * 100 if rate else np.nan,
+            "Coupon Rate (%)": capped_rate * 100 if capped_rate else np.nan,
+            "Coupon Amount": coupon
         })
-    return pd.DataFrame(schedule)
 
+    return pd.DataFrame(coupon_data)
+
+# ----------------------------
+# 4. run and plot
+# ----------------------------
 
 def main():
-    df_rates = load_and_clean_rates(euribor_rates_file_path)
+    euribor_df = load_euribor(euribor_rates_file_path)
+    holidays = load_holidays(holidays_file_path)
 
-    start_date = datetime(2022, 7, 29)
-    current_date = datetime.now()
-    frequency_months = 3  # Quarterly
+    df_coupons = build_historical_coupons(euribor_df, holidays)
+    print(df_coupons)
 
-    coupon_dates = generate_coupon_dates(start_date, current_date, frequency_months)
-    df_schedule = build_coupon_schedule(coupon_dates)
-
-    df_schedule["start_date"] = df_schedule["start_date_unadj"].apply(adjust_eom)
-    df_schedule["end_date"] = df_schedule["end_date_unadj"].apply(adjust_eom)
-
-    df_schedule["reset_date"] = df_schedule["start_date"].apply(find_reset_date)
-    df_schedule["reference_rate"] = df_schedule["reset_date"].apply(lambda d: get_reference_rate(d, df_rates))
-
-    df_schedule["coupon_rate"] = df_schedule["reference_rate"].clip(
-        lower=bond_characteristics["Floor"] * 100,
-        upper=bond_characteristics["Cap"] * 100
-    )
-
-    notional = bond_characteristics["Nominal Value"]
-    day_count_fraction = 0.25  # Approximate for quarterly 30/360
-
-    df_schedule["coupon_amount"] = (
-        notional * df_schedule["coupon_rate"] * day_count_fraction
-    )
-
-    final_columns = [
-        "reset_date",
-        "start_date",
-        "end_date",
-        "reference_rate",
-        "coupon_rate",
-        "coupon_amount"
-    ]
-    df_result = df_schedule[final_columns].copy()
-    print(df_result)
-
-    # Plot
-    plt.plot(df_result["start_date"], df_result["coupon_rate"], marker='o')
-    plt.title("Coupon Rate Over Time")
-    plt.xlabel("Coupon Start Date")
-    plt.ylabel("Coupon Rate")
+    # plot historical capped/floored coupon rates
+    plt.figure(figsize=(10, 5))
+    plt.plot(df_coupons["Start Date"], df_coupons["Coupon Rate (%)"], marker="o")
+    plt.title("Historical Capped/Floored Coupon Rates")
+    plt.xlabel("Start Date")
+    plt.ylabel("Coupon Rate (%)")
     plt.grid(True)
-    plt.xticks(rotation=46)
+    plt.xticks(rotation=45)
     plt.tight_layout()
     plt.show()
 
-
 if __name__ == "__main__":
     main()
+
+# %%
