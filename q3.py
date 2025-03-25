@@ -65,7 +65,7 @@ def load_rate_helpers(file_path, fixing_days=2):
             ql.Euribor3M()
         )
         for _, row in irs_df.iterrows()
-        if (maturity := extract_maturity(row['Name'])) and maturity > 1
+        if (maturity := extract_maturity(row['Name'])) and maturity >= 1
     ]
 
     return depo_helpers + swap_helpers
