@@ -25,6 +25,21 @@ recovery_rate = 0.40   # as given
 # ----------------------------
 
 def survival_prob(t, cds, R):
+    """
+    Calculate the survival probability at time t for a credit default swap (CDS).
+
+    Parameters:
+        t (float): The time (in years) for which the survival probability is calculated.
+        cds (float): The credit default swap spread (annualized rate).
+        R (float): The recovery rate (fraction of notional recovered in case of default).
+
+    Returns:
+        float: The survival probability at time t.
+
+    Notes:
+        - The formula assumes a simplified exponential decay model for survival probability.
+        - Ensure that 0 <= R < 1 to avoid division by zero or invalid results.
+    """
     return (np.exp(-cds * t) - R) / (1 - R)
 
 # ----------------------------

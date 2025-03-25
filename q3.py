@@ -23,6 +23,31 @@ curve_day_counter = ql.Actual360()
 # ----------------------------
 
 def load_rate_helpers(file_path, fixing_days=2):
+    """
+    Load rate helpers for deposits and interest rate swaps (IRS) from an Excel file.
+
+    This function reads deposit rates and IRS rates from an Excel file and creates 
+    QuantLib rate helpers for use in curve construction. Deposit rate helpers are 
+    created for short-term maturities, while swap rate helpers are created for 
+    maturities greater than one year.
+
+    Args:
+        file_path (str): The path to the Excel file containing the deposit and IRS rates.
+        fixing_days (int, optional): The number of fixing days for the instruments. 
+            Defaults to 2.
+
+    Returns:
+        list: A list of QuantLib rate helpers, including both deposit and swap rate helpers.
+
+    Notes:
+        - The Excel file should have two sheets:
+            1. "Deposit Rates": Contains deposit rate data with columns 'RIC' and 'Last'.
+            2. "IRS Rates": Contains IRS rate data with columns 'Name' and 'Last'.
+        - The 'RIC' column in the "Deposit Rates" sheet should match the keys in the 
+          `deposit_ric_map` dictionary.
+        - The 'Name' column in the "IRS Rates" sheet should contain maturity information 
+          in the format "<number>Y" (e.g., "5Y" for a 5-year maturity).
+    """
     calendar = ql.TARGET()
     deposit_day_counter = ql.Actual360()
 
@@ -96,10 +121,10 @@ def build_curves():
 # ----------------------------
 
 end_date = calendar.advance(spot_date, ql.Period(60, ql.Years))
-n_points = 100
+n_points = 100    # number of points on the curve
 dates = [spot_date + ql.Period(int(i * (end_date.serialNumber() - spot_date.serialNumber()) / n_points), ql.Days)
-         for i in range(n_points + 1)]
-date_strings = [d.ISO() for d in dates]
+         for i in range(n_points + 1)] # evaluation dates
+date_strings = [d.ISO() for d in dates] 
 max_forward_date = calendar.advance(end_date, -ql.Period(1, ql.Years))
 
 # ----------------------------

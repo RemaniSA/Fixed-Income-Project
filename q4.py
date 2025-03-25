@@ -52,6 +52,22 @@ schedule = ql.Schedule(
 # ------------------
 
 def generate_cashflows(rate):
+    """
+    Generates a DataFrame of cashflows for a given coupon rate.
+
+    Args:
+        rate (float): The annual coupon rate as a decimal (e.g., 0.05 for 5%).
+
+    Returns:
+        pandas.DataFrame: A DataFrame containing the following columns:
+            - "Start Date": The start date of the cashflow period.
+            - "End Date": The end date of the cashflow period.
+            - "Year Fraction": The year fraction between the start and end dates.
+            - "Coupon Rate (%)": The coupon rate expressed as a percentage.
+            - "Coupon Amount": The coupon payment for the period.
+            - "Discount Factor": The discount factor for the end date.
+            - "PV": The present value of the coupon payment.
+    """
     cashflows = []
     for i in range(len(schedule) - 1):
         start = schedule[i]

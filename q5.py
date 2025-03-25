@@ -35,6 +35,21 @@ shift = 0.03
 # ----------------------------
 
 def load_shifted_vol_surface(filepath):
+    """
+    Loads a shifted volatility surface from a CSV file, processes the data, and returns it as a DataFrame.
+
+    The function reads a CSV file containing a volatility surface, removes unnecessary columns 
+    ("STK" and "ATM" if they exist), converts the "Maturity" column to float, and sets it as the 
+    index of the DataFrame. The column names are also converted to floats, and the values are 
+    scaled from basis points (bps) to decimals.
+
+    Args:
+        filepath (str): The file path to the CSV file containing the shifted volatility surface.
+
+    Returns:
+        pandas.DataFrame: A DataFrame containing the processed volatility surface, with maturities 
+        as the index and scaled volatilities as the values.
+    """
     df = pd.read_csv(filepath)
     df = df.drop(columns=["STK", "ATM"], errors="ignore")
     df["Maturity"] = df["Maturity"].astype(float)
@@ -45,6 +60,30 @@ def load_shifted_vol_surface(filepath):
 vol_surface = load_shifted_vol_surface(vol_path)
 
 def interpolate_vol(maturity, strike_percent):
+    """
+    Interpolates the implied volatility for a given option maturity and strike percentage
+    using a volatility surface.
+
+    Parameters:
+        maturity (float): The maturity of the option in years. If the exact maturity
+                          is not available in the volatility surface, the closest
+                          available maturity will be used.
+        strike_percent (float): The strike price as a percentage of the underlying asset's
+                                current price.
+
+    Returns:
+        float: The interpolated implied volatility corresponding to the given maturity
+               and strike percentage.
+
+    Notes:
+        - The function assumes the existence of a global variable `vol_surface`, which
+          is a pandas DataFrame where the rows represent maturities, the columns represent
+          strike percentages, and the values represent implied volatilities.
+        - If the exact maturity is not found in the volatility surface, the closest
+          maturity is selected based on the absolute difference.
+        - Linear interpolation is performed using numpy's `interp` function to estimate
+          the implied volatility for the given strike percentage.
+    """
     if maturity not in vol_surface.index:
         maturity = min(vol_surface.index, key=lambda x: abs(x - maturity))
     row = vol_surface.loc[maturity]
@@ -84,6 +123,16 @@ vol_floor = interpolate_vol(maturity, floor_rate * 100)
 # ----------------------------
 
 def make_engine(vol):
+    """
+    Creates a BlackCapFloorEngine with the specified volatility.
+    
+    Parameters:
+        vol (float): The volatility to use in the BlackCapFloorEngine.
+
+    Returns:
+        ql.BlackCapFloorEngine: The BlackCapFloorEngine object with the specified
+        volatility and other parameters set.    
+    """
     return ql.BlackCapFloorEngine(
         ql.YieldTermStructureHandle(log_cubic_curve),
         ql.QuoteHandle(ql.SimpleQuote(vol)),
