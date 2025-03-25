@@ -1,5 +1,6 @@
 # TODO: Add df_worst to the CVA calculation and sensitivity analysis.
 # Rerun with df_worst instead of df_best.
+# TODO: Fix coupon exposure to be the variable coupon amount instead of the best case coupoons
 # %%
 import os
 import pandas as pd
