@@ -90,14 +90,13 @@ def generate_cashflows(rate):
 # ------------------
 
 df_best = generate_cashflows(cap)
+df_worst = generate_cashflows(floor)
 
 # ------------------
 # 5. main script block
 # ------------------
 
 def main():
-
-    df_worst = generate_cashflows(floor)
 
     npv_best = df_best["PV"].sum()
     npv_worst = df_worst["PV"].sum()

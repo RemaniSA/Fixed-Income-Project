@@ -85,7 +85,7 @@ cf_rows.append({
     "Present Value": round(pv_redemption, 4)
 })
 
-df_q8 = pd.DataFrame(cf_rows)
+coupon_table = pd.DataFrame(cf_rows)
 
 # --- Accrued Interest ---
 accrued = 0.0
@@ -102,12 +102,12 @@ for i in range(len(schedule) - 1):
         break
 
 # --- Prices ---
-gross_price = df_q8["Present Value"].sum()
+gross_price = coupon_table["Present Value"].sum()
 clean_price = gross_price - accrued
 
 # --- Output ---
 print("\nQ8: Forward Rate-Based Coupon Table (Including Redemption)")
-print(df_q8)
+print(coupon_table)
 
 print("\nBond Pricing Summary:")
 print(f"Gross Price (Dirty): {round(gross_price, 4)}")
