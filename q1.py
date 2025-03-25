@@ -6,7 +6,7 @@ import seaborn as sns
 from datetime import datetime
 
 # -------------------
-# Bond Characteristics DataFrame
+# bond characteristics
 # -------------------
 bond_characteristics = {
     'Issuer': 'BNP Paribas',
@@ -57,13 +57,13 @@ def coupon_payoff(r, floor, cap):
 
 def main():
     # -------------------
-    # Key Dates
+    # key dates
     # -------------------
     trade_date = pd.to_datetime("24/11/2024", dayfirst=True)
     spot_lag = 2
     value_date = trade_date + pd.Timedelta(days=spot_lag)
 
-    # Calculate the first interest payment date
+    # date of first interest payment
     first_interest_payment_date = get_next_payment_date(trade_date, bond_characteristics['Interest Payment Dates'])
 
     key_dates = {
@@ -76,13 +76,13 @@ def main():
     df_key_dates = pd.DataFrame(list(key_dates.items()), columns=["Key Date", "Value"])
     print(df_key_dates)
 
-    # Convert bond characteristics to DataFrame
+    # create dataframe of bond char.
     df_bond = pd.DataFrame(list(bond_characteristics.items()), columns=["Characteristic", "Value"])
     df_bond.set_index("Characteristic", inplace=True)
 
     # -------------------
-    # Visualise Coupon Payoff
-    # -------------------
+    # cap and floor the ref. rate
+    # -----------------
     floor = bond_characteristics['Floor']
     cap = bond_characteristics['Cap']
     euribor_range = np.arange(0, 0.0501, 0.001)
@@ -96,6 +96,9 @@ def main():
 
     print(df_coupon_payoff)
 
+    # -------------------
+    # plot coupon payoff vs 3M euribor rate
+    # ----------------
     sns.set(style="whitegrid", context="notebook")
     plt.figure(figsize=(10, 6))
     plt.axhline(y=cap * 100, color='red', linestyle='--', label='Cap (3.70%)')
