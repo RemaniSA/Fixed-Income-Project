@@ -31,12 +31,12 @@ base_points = 1
 # Build shifted curves
 shifted_curves = {
     "Base": base_curve,
-    "Parallel +10bps": make_zero_curve(dates, apply_parallel_shift(base_rates, base_points), calendar, day_counter_curve),
-    "Parallel -10bps": make_zero_curve(dates, apply_parallel_shift(base_rates, -base_points), calendar, day_counter_curve),
-    "Slope +10bps": make_zero_curve(dates, apply_slope_shift(base_rates, base_points), calendar, day_counter_curve),
-    "Slope -10bps": make_zero_curve(dates, apply_slope_shift(base_rates, -base_points), calendar, day_counter_curve),
-    "Curvature +10bps": make_zero_curve(dates, apply_curvature_shift(base_rates, 0.0001), calendar, day_counter_curve),
-    "Curvature -10bps": make_zero_curve(dates, apply_curvature_shift(base_rates, -0.0001), calendar, day_counter_curve),
+    "Parallel +1bps": make_zero_curve(dates, apply_parallel_shift(base_rates, base_points), calendar, day_counter_curve),
+    "Parallel -1bps": make_zero_curve(dates, apply_parallel_shift(base_rates, -base_points), calendar, day_counter_curve),
+    "Slope +1bps": make_zero_curve(dates, apply_slope_shift(base_rates, base_points), calendar, day_counter_curve),
+    "Slope -1bps": make_zero_curve(dates, apply_slope_shift(base_rates, -base_points), calendar, day_counter_curve),
+    "Curvature +1bps": make_zero_curve(dates, apply_curvature_shift(base_rates, 0.0001), calendar, day_counter_curve),
+    "Curvature -1bps": make_zero_curve(dates, apply_curvature_shift(base_rates, -0.0001), calendar, day_counter_curve),
 }
 
 # =============================================================================
