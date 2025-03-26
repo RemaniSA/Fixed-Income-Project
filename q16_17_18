@@ -1,8 +1,30 @@
 #%%
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 
+# CDS sensitivity from q6
+q6data = [
+    {"CDS Spread": 0.002, "Adjusted NPV": 991.779335},
+    {"CDS Spread": 0.003, "Adjusted NPV": 987.382883},
+    {"CDS Spread": 0.004, "Adjusted NPV": 982.998305},
+    {"CDS Spread": 0.005, "Adjusted NPV": 978.625570},
+    {"CDS Spread": 0.006, "Adjusted NPV": 974.264644},
+    {"CDS Spread": 0.007, "Adjusted NPV": 969.915497}
+]
+
+CDSsens = pd.DataFrame(q6data)
+
+# Calculate price sensitivity (first-order forward difference)
+CDSsens["Sensitivity"] = CDSsens["Adjusted NPV"].diff() / CDSsens["CDS Spread"].diff()
+
+# Sensitivity per basis point
+CDSsens["Sensitivity (per bps)"] = CDSsens["Sensitivity"] / 10000
+
+beta_cds = CDSsens["Sensitivity"].mean()
+
+#%%
 # Given variances
 var_l = 0.022
 var_s = 0.003
@@ -19,7 +41,7 @@ std_cds = np.sqrt(var_cds)
 beta_l = 1.2
 beta_s = 0.8
 beta_c = 0.5
-beta_cds = 0.9
+
 
 # Monte Carlo simulation
 n_simulations = 100000
@@ -49,7 +71,7 @@ std_total = np.sqrt(total_var)
 
 # Normal 99% quantile
 z_99 = norm.ppf(0.01)
-VaR_exact = -z_99 * std_total
+VaR_exact = z_99 * std_total
 ES_exact = std_total * norm.pdf(z_99) / 0.01
 
 # === QUESTION 18 ===
