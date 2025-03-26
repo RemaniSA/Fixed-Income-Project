@@ -120,19 +120,38 @@ print("-------------------------------------------------------------------------
 print("{:<25} {:>12} {:>15} {:>15} {:>20}".format("Interpolation Method", "Bond Price", "Bond DV01", "Swap DV01", "Hedge Notional"))
 print("----------------------------------------------------------------------------------------------")
 
-for curve_name, curve in curves.items():
-    # Create a YieldTermStructureHandle for the current curve.
-    yc_handle = ql.YieldTermStructureHandle(curve)
-
-    # Use this handle to construct the floating index
-    euribor3m = ql.Euribor3M(yc_handle)
-
-    # Rebuild the FloatingRateBond with euribor3m as the index
+for curve_name, forward_curve in curves.items():
+    # Create a handle for the forward curve
+    forward_handle = ql.YieldTermStructureHandle(forward_curve)
+    
+    # -------------------------------------------------------------------------
+    # 1. Build a discount curve from the forward curve
+    # -------------------------------------------------------------------------
+    # Retrieve the dates from the forward curve (these should cover the maturities of interest)
+    dates = forward_curve.dates()
+    # Get the day counter from the forward curve; if not available, you can default to Actual365Fixed
+    try:
+        day_counter = forward_curve.dayCounter()
+    except AttributeError:
+        day_counter = ql.Actual365Fixed()
+    # Compute discount factors at each date from the forward curve
+    discount_factors = [forward_curve.discount(date) for date in dates]
+    # Build a discount curve using these dates and discount factors
+    discount_curve = ql.DiscountCurve(dates, discount_factors, day_counter)
+    discount_handle = ql.YieldTermStructureHandle(discount_curve)
+    
+    # -------------------------------------------------------------------------
+    # 2. Build the floating index using the forward curve (for projecting coupons)
+    # -------------------------------------------------------------------------
+    euribor3m = ql.Euribor3M(forward_handle)
+    
+    # Re-create the bond for this curve iteration with the new index.
+    # (Reinstantiating the bond is safest because the index is set at construction.)
     bond = ql.FloatingRateBond(
         settlementDays=settlement_days,
         faceAmount=bond_characteristics['Nominal Value'],
         schedule=bond_schedule,
-        index=euribor3m,  # <-- no dummy
+        index=euribor3m,  # Use forward curve for forecasting
         paymentDayCounter=ql.Thirty360(ql.Thirty360.BondBasis),
         paymentConvention=ql.ModifiedFollowing,
         fixingDays=2,
@@ -144,51 +163,41 @@ for curve_name, curve in curves.items():
         redemption=100.0,
         issueDate=issue_date
     )
-
-    # Set a pricer for the floating coupons (e.g. Black pricer)
     pricer = ql.BlackIborCouponPricer()
     ql.setCouponPricer(bond.cashflows(), pricer)
     
-    # ---------------------------
-    # 6.1 Bond Pricing & DV01 Computation
-    # ---------------------------
-    # Rebuild the bond pricing engine with the current yield curve.
-    bond.setPricingEngine(ql.DiscountingBondEngine(yc_handle))
+    # Use the discount curve for pricing
+    bond.setPricingEngine(ql.DiscountingBondEngine(discount_handle))
     bond_price = bond.cleanPrice()
-    bond_dv01 = compute_bond_dv01(bond, curve)
+    # Compute bond DV01 using the discount curve
+    bond_dv01 = compute_bond_dv01(bond, discount_curve)
     
-    # ---------------------------
-    # 6.2 Determine Swap Type Based on Bond DV01
-    # ---------------------------
-    # If the bond DV01 is negative (i.e., bond loses when rates rise), we need an instrument with positive DV01.
-    # Use a Payer swap. Otherwise, if bond DV01 is positive, use a Receiver swap.
+    # -------------------------------------------------------------------------
+    # 3. Construct the Swap using the forward curve for the floating leg and the discount curve for discounting
+    # -------------------------------------------------------------------------
+    # Determine swap type based on bond DV01
     if bond_dv01 < 0:
         swap_type = ql.VanillaSwap.Payer
     else:
         swap_type = ql.VanillaSwap.Receiver
-
-    # ---------------------------
-    # 6.3 Swap Setup: Create a Vanilla Swap Using the Current Yield Curve
-    # ---------------------------
-    # Rebuild the Euribor6M index using the current yield curve.
-    euribor_index = ql.Euribor6M(yc_handle)
+    
+    # Rebuild the floating leg index (using the forward curve)
+    euribor_index = ql.Euribor6M(forward_handle)
     swap = ql.VanillaSwap(
-        swap_type,    # chosen dynamically based on bond DV01
-        bond_characteristics['Nominal Value'],      # Notional
+        swap_type,
+        bond_characteristics['Nominal Value'],  # Notional amount
         fixed_schedule, fixed_rate, ql.Thirty360(ql.Thirty360.BondBasis),
         floating_schedule, euribor_index, 0.0, ql.Actual360()
     )
-    swap_engine = ql.DiscountingSwapEngine(yc_handle)
+    # Use the discount curve for discounting the swap cash flows
+    swap_engine = ql.DiscountingSwapEngine(discount_handle)
     swap.setPricingEngine(swap_engine)
     
     swap_npv = swap.NPV()
-    swap_dv01 = compute_dv01(swap, curve)
+    swap_dv01 = compute_dv01(swap, discount_curve)
     
-    # ---------------------------
-    # 7.4 Calculate Hedge Notional
-    # ---------------------------
-    # Hedge notional = |bond DV01| / |swap DV01|
+    # Calculate hedge notional as the ratio of DV01s (absolute values)
     hedge_notional = abs(bond_dv01) / abs(swap_dv01) if swap_dv01 != 0 else float('inf')
     
-    # Print results.
+    # Print the results for this curve
     print("{:<25} {:>12.2f} {:>15.2f} {:>15.2f} {:>20.0f}".format(curve_name, bond_price, bond_dv01, swap_dv01, hedge_notional))
