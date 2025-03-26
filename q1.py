@@ -2,7 +2,6 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 from datetime import datetime
 
 # -------------------
@@ -100,7 +99,6 @@ def main():
     # -------------------
     # plot coupon payoff vs 3M euribor rate
     # ----------------
-    sns.set(style="whitegrid", context="notebook")
     plt.figure(figsize=(10, 6))
     plt.axhline(y=cap * 100, color='red', linestyle='--', label='Cap (3.70%)')
     plt.axhline(y=floor * 100, color='green', linestyle='--', label='Floor (1.60%)')

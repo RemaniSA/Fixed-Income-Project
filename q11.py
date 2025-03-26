@@ -164,14 +164,14 @@ for title, group_labels in plot_groups.items():
     plt.figure(figsize=(10, 5), dpi=150)
     for name in group_labels:
         curve = shifted_curves[name]
-        rates = [curve.zeroRate(d, day_counter_curve, ql.Continuous).rate() * 100 for d in dates]
+        dfs = [curve.discount(d) for d in dates]
         linestyle = '-' if name == "Base" else '--' if "+10bps" in name else '-.'
-        plt.plot(date_labels, rates, label=name, linestyle=linestyle)
+        plt.plot(date_labels, dfs, label=name, linestyle=linestyle)
 
-    plt.title(f"Spot Rate Curves – {title}")
-    plt.ylabel("Zero Rate (%)")
+    plt.title(f"Discount Factor Curves – {title}")
+    plt.ylabel("Discount Factor")
     plt.xlabel("Maturity Date")
-    plt.xticks(date_strings[::5],rotation=45)
+    plt.xticks(date_strings[::5], rotation=45)
     plt.grid(axis='y')
     plt.legend()
     plt.tight_layout()
