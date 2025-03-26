@@ -73,7 +73,7 @@ delta_GP = beta_l * delta_l + beta_s * delta_s + beta_c * delta_c + beta_cds * d
 PnL = -delta_GP  # Loss
 
 # Monte Carlo VaR & ES (99%)
-VaR_mc = np.percentile(PnL, 1)
+VaR_mc = -np.percentile(PnL, 1)
 ES_mc = PnL[PnL >= VaR_mc].mean()
 
 
@@ -88,27 +88,27 @@ std_total = np.sqrt(total_var)
 
 # Normal 99% quantile
 z_99 = norm.ppf(0.01)
-VaR_exact = z_99 * std_total
+VaR_exact = -z_99 * std_total
 ES_exact = std_total * norm.pdf(z_99)
 
 # === QUESTION 18 ===
 # Marginal VaR is proportional to beta_i * std_i / std_total
 # Component VaR = Marginal VaR * Beta_i
 marginal_VaRs = {
-    'l': beta_l * var_l / std_total,
-    's': beta_s * var_s / std_total,
-    'c': beta_c * var_c / std_total,
-    'cds': beta_cds * var_cds / std_total
+    'l': beta_l * np.sqrt(var_l) / std_total,
+    's': beta_s * np.sqrt(var_s) / std_total,
+    'c': beta_c * np.sqrt(var_c) / std_total,
+    'cds': beta_cds * np.sqrt(var_cds) / std_total
 }
 
-component_VaRs = {
-    k: v * z_99 for k, v in marginal_VaRs.items()
-}
+component_VaRs = {k: v * std_total * z_99 for k, v in marginal_VaRs.items()}
 
+print(f"Sum of component VaRs: {sum(component_VaRs.values()):.6f}")
+print(f"Exact Total VaR:       {VaR_exact:.6f}")
 # === OUTPUT ===
 print(f"\nMonte Carlo 99% VaR: {VaR_mc:.4f}")
-print(f"Monte Carlo 99% ES: {ES_mc:.4f}")
 print(f"Exact (Analytical) 99% VaR: {VaR_exact:.4f}")
+print(f"Monte Carlo 99% ES: {ES_mc:.4f}")
 print(f"Exact (Analytical) 99% ES: {ES_exact:.4f}")
 
 print("\nComponent VaR contributions:")
