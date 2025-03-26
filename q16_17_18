@@ -1,0 +1,111 @@
+#%%
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.stats import norm
+
+# CDS sensitivity from q6
+q6data = [
+    {"CDS Spread": 0.002, "Adjusted NPV": 991.779335},
+    {"CDS Spread": 0.003, "Adjusted NPV": 987.382883},
+    {"CDS Spread": 0.004, "Adjusted NPV": 982.998305},
+    {"CDS Spread": 0.005, "Adjusted NPV": 978.625570},
+    {"CDS Spread": 0.006, "Adjusted NPV": 974.264644},
+    {"CDS Spread": 0.007, "Adjusted NPV": 969.915497}
+]
+
+CDSsens = pd.DataFrame(q6data)
+
+# Calculate price sensitivity (first-order forward difference)
+CDSsens["Sensitivity"] = CDSsens["Adjusted NPV"].diff() / CDSsens["CDS Spread"].diff()
+
+# Sensitivity per basis point
+CDSsens["Sensitivity (per bps)"] = CDSsens["Sensitivity"] / 10000
+
+beta_cds = CDSsens["Sensitivity"].mean()
+
+#%%
+# Given variances
+var_l = 0.022
+var_s = 0.003
+var_c = 0.001
+var_cds = 0.002
+
+# Standard deviations
+std_l = np.sqrt(var_l)
+std_s = np.sqrt(var_s)
+std_c = np.sqrt(var_c)
+std_cds = np.sqrt(var_cds)
+
+# Betas (To be adjusted according to the calculated sensitivity)
+beta_l = 1.2
+beta_s = 0.8
+beta_c = 0.5
+
+
+# Monte Carlo simulation
+n_simulations = 100000
+np.random.seed(42)
+
+delta_l = np.random.normal(0, std_l, n_simulations)
+delta_s = np.random.normal(0, std_s, n_simulations)
+delta_c = np.random.normal(0, std_c, n_simulations)
+delta_cds = np.random.normal(0, std_cds, n_simulations)
+
+# Change in bond price
+delta_GP = beta_l * delta_l + beta_s * delta_s + beta_c * delta_c + beta_cds * delta_cds
+PnL = -delta_GP  # Loss
+
+# Monte Carlo VaR & ES (99%)
+VaR_mc = np.percentile(PnL, 1)
+ES_mc = PnL[PnL >= VaR_mc].mean()
+
+# === QUESTION 17 ===
+# Analytical (exact) VaR & ES using normal distribution
+# Total variance of delta_GP
+total_var = (beta_l**2 * var_l +
+             beta_s**2 * var_s +
+             beta_c**2 * var_c +
+             beta_cds**2 * var_cds)
+std_total = np.sqrt(total_var)
+
+# Normal 99% quantile
+z_99 = norm.ppf(0.01)
+VaR_exact = z_99 * std_total
+ES_exact = std_total * norm.pdf(z_99) / 0.01
+
+# === QUESTION 18 ===
+# Marginal VaR is proportional to beta_i * std_i / std_total
+# Component VaR = Marginal VaR * Beta_i
+marginal_VaRs = {
+    'l': beta_l * var_l / std_total,
+    's': beta_s * var_s / std_total,
+    'c': beta_c * var_c / std_total,
+    'cds': beta_cds * var_cds / std_total
+}
+
+component_VaRs = {
+    k: v * z_99 for k, v in marginal_VaRs.items()
+}
+
+# === OUTPUT ===
+print(f"\nMonte Carlo 99% VaR: {VaR_mc:.4f}")
+print(f"Monte Carlo 99% ES: {ES_mc:.4f}")
+print(f"Exact (Analytical) 99% VaR: {VaR_exact:.4f}")
+print(f"Exact (Analytical) 99% ES: {ES_exact:.4f}")
+
+print("\nComponent VaR contributions:")
+for factor in component_VaRs:
+    print(f"  {factor}: {component_VaRs[factor]:.4f}")
+
+# Plot
+plt.hist(PnL, bins=100, alpha=0.7, edgecolor='k')
+plt.axvline(VaR_mc, color='red', linestyle='--', linewidth=2, label=f'MC VaR = {VaR_mc:.4f}')
+plt.axvline(VaR_exact, color='blue', linestyle='--', linewidth=2, label=f'Exact VaR = {VaR_exact:.4f}')
+plt.title('Profit and Loss Distribution')
+plt.xlabel('Loss')
+plt.ylabel('Frequency')
+plt.legend()
+plt.grid()
+plt.show()
+# %%
