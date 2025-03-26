@@ -22,8 +22,24 @@ CDSsens["Sensitivity"] = CDSsens["Adjusted NPV"].diff() / CDSsens["CDS Spread"].
 # Sensitivity per basis point
 CDSsens["Sensitivity (per bps)"] = CDSsens["Sensitivity"] / 10000
 
-beta_cds = CDSsens["Sensitivity"].mean()
+beta_cds = CDSsens["Sensitivity (per bps)"].mean()
 
+# import q11 output
+shiftsens = pd.read_csv("bond_sensitivity_prices.csv", index_col=0)
+base_price = shiftsens.loc["Base", "Clean Price"]
+parallel_up = shiftsens.loc["Parallel +10bps", "Clean Price"]
+parallel_dn = shiftsens.loc["Parallel -10bps", "Clean Price"]
+
+# DV01 (symmetric approx): average price change per 1bp
+dv01 = (parallel_dn - parallel_up) / 2 / 10
+# Slope and Curvature change per 1 bp
+slope_sens = (shiftsens.loc["Slope -10bps", "Clean Price"] - shiftsens.loc["Slope +10bps", "Clean Price"]) / 2 / 10
+curv_sens = (shiftsens.loc["Curvature -10bps", "Clean Price"] - shiftsens.loc["Curvature +10bps", "Clean Price"]) / 2 / 10
+
+print(f"Parallel DV01: {dv01:.6f}")
+print(f"Parallel DV01: {dv01:.6f}")
+print(f"Slope Sensitivity:     {slope_sens:.6f} per 1bp")
+print(f"Curvature Sensitivity: {curv_sens:.6f} per 1bp")
 #%%
 # Given variances
 var_l = 0.022
@@ -37,14 +53,14 @@ std_s = np.sqrt(var_s)
 std_c = np.sqrt(var_c)
 std_cds = np.sqrt(var_cds)
 
-# Betas (To be adjusted according to the calculated sensitivity)
-beta_l = 1.2
-beta_s = 0.8
-beta_c = 0.5
-
+# Betas (from above)
+beta_l = dv01
+beta_s = slope_sens
+beta_c = curv_sens
+beta_cds = beta_cds 
 
 # Monte Carlo simulation
-n_simulations = 100000
+n_simulations = 1000000
 np.random.seed(42)
 
 delta_l = np.random.normal(0, std_l, n_simulations)

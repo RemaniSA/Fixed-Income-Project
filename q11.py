@@ -177,5 +177,5 @@ for title, group_labels in plot_groups.items():
     plt.show()
     
 
-
+df_prices.to_csv("bond_sensitivity_prices.csv") # Output the results for Q16-18
 #%%
