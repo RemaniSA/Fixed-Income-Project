@@ -40,7 +40,7 @@ print(f"Parallel DV01: {dv01:.6f}")
 print(f"Slope Sensitivity:     {slope_sens:.6f} per 1bp")
 print(f"Curvature Sensitivity: {curv_sens:.6f} per 1bp")
 print(f"CDS Sensitivity {beta_cds:.6f} per 1bp")
-#%%
+
 # Given variances
 var_l = 0.022
 var_s = 0.003
@@ -89,7 +89,8 @@ std_total = np.sqrt(total_var)
 # Normal 99% quantile
 z_99 = norm.ppf(0.01)
 VaR_exact = -z_99 * std_total
-ES_exact = std_total * norm.pdf(z_99)
+ES_exact = std_total * norm.pdf(z_99)*100
+
 
 # === QUESTION 18 ===
 # Marginal VaR is proportional to beta_i * std_i / std_total
@@ -103,8 +104,7 @@ marginal_VaRs = {
 
 component_VaRs = {k: v * std_total * z_99 for k, v in marginal_VaRs.items()}
 
-print(f"Sum of component VaRs: {sum(component_VaRs.values()):.6f}")
-print(f"Exact Total VaR:       {VaR_exact:.6f}")
+
 # === OUTPUT ===
 print(f"\nMonte Carlo 99% VaR: {VaR_mc:.4f}")
 print(f"Exact (Analytical) 99% VaR: {VaR_exact:.4f}")
@@ -114,11 +114,14 @@ print(f"Exact (Analytical) 99% ES: {ES_exact:.4f}")
 print("\nComponent VaR contributions:")
 for factor in component_VaRs:
     print(f"  {factor}: {component_VaRs[factor]:.4f}")
+    
+print(f"Sum of component VaRs: {sum(component_VaRs.values()):.6f}")
+print(f"Exact Total VaR:       {VaR_exact:.6f}")
 
 # Plot
 plt.hist(PnL, bins=100, alpha=0.7, edgecolor='k')
-plt.axvline(VaR_mc, color='red', linestyle='--', linewidth=2, label=f'MC VaR = {VaR_mc:.4f}')
-plt.axvline(VaR_exact, color='blue', linestyle='--', linewidth=2, label=f'Exact VaR = {VaR_exact:.4f}')
+plt.axvline(-VaR_mc, color='red', linestyle='--', linewidth=2, label=f'MC VaR = {VaR_mc:.4f}')
+plt.axvline(-VaR_exact, color='blue', linestyle='--', linewidth=2, label=f'Exact VaR = {VaR_exact:.4f}')
 plt.title('Profit and Loss Distribution')
 plt.xlabel('Loss')
 plt.ylabel('Frequency')
