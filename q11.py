@@ -179,4 +179,4 @@ for title, group_labels in plot_groups.items():
     
 
 df_prices.to_csv("bond_sensitivity_prices.csv") # Output the results for Q16-18
-#%%
+#%%df_prices.to_csv("bond_sensitivity_prices.csv") # Output the results for Q16-18
