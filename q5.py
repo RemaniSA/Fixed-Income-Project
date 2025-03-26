@@ -140,8 +140,9 @@ def make_engine(vol):
         shift
     )
 
-fixing_date = calendar.advance(eval_date, -settlement_lag, ql.Days)
+fixing_date = eval_date  # since our data is our Eval Date
 index.addFixing(fixing_date, cap_rate)
+
 cap.setPricingEngine(make_engine(vol_cap))
 floor.setPricingEngine(make_engine(vol_floor))
 

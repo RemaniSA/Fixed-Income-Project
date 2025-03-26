@@ -10,8 +10,8 @@ import re
 # 0. setup evaluation date and day count convention
 # ----------------------------
 
-spot_date = ql.Date(26, 11, 2024)
-ql.Settings.instance().evaluationDate = spot_date
+eval_date = ql.Date(18, 11, 2024) # this is because we value the curve on 18th Nov 2024 using Excel MarketData.xlsx to consider whether to invest in a 5-year bond
+ql.Settings.instance().evaluationDate = eval_date
 calendar = ql.TARGET()
 fixing_days = 2
 
@@ -104,10 +104,10 @@ def build_curves():
     market_data_file_path = os.path.join(ROOT_PATH, 'datasets', 'MarketData.xlsx')
     rate_helpers = load_rate_helpers(market_data_file_path)
 
-    linear_curve = ql.PiecewiseLinearZero(spot_date, rate_helpers, curve_day_counter)
-    flat_curve = ql.PiecewiseFlatForward(spot_date, rate_helpers, curve_day_counter)
-    cubic_curve = ql.PiecewiseCubicZero(spot_date, rate_helpers, curve_day_counter)
-    log_cubic_curve = ql.PiecewiseLogCubicDiscount(spot_date, rate_helpers, curve_day_counter)
+    linear_curve = ql.PiecewiseLinearZero(eval_date, rate_helpers, curve_day_counter)
+    flat_curve = ql.PiecewiseFlatForward(eval_date, rate_helpers, curve_day_counter)
+    cubic_curve = ql.PiecewiseCubicZero(eval_date, rate_helpers, curve_day_counter)
+    log_cubic_curve = ql.PiecewiseLogCubicDiscount(eval_date, rate_helpers, curve_day_counter)
 
     return {
         "Linear": linear_curve,
@@ -120,9 +120,12 @@ def build_curves():
 # 3. evaluation grid
 # ----------------------------
 
-end_date = calendar.advance(spot_date, ql.Period(60, ql.Years))
+# Note: these dates are used for curve plotting and tabling, but are not indicative of the full range of the curve
+# The curve is built for al maturities up to 60 years and can be evaluated at any date within that range
+
+end_date = calendar.advance(eval_date, ql.Period(60, ql.Years))
 n_points = 100    # number of points on the curve
-dates = [spot_date + ql.Period(int(i * (end_date.serialNumber() - spot_date.serialNumber()) / n_points), ql.Days)
+dates = [eval_date + ql.Period(int(i * (end_date.serialNumber() - eval_date.serialNumber()) / n_points), ql.Days)
          for i in range(n_points + 1)] # evaluation dates
 date_strings = [d.ISO() for d in dates] 
 max_forward_date = calendar.advance(end_date, -ql.Period(1, ql.Years))

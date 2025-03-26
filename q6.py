@@ -7,15 +7,15 @@ from q1 import bond_characteristics
 from q3 import build_curves
 
 # ----------------------------
-# 0. Setup
+# 0. setup evaluation date and day count convention
 # ----------------------------
 
 log_cubic_curve = build_curves()["Log-Cubic"]
-spot_date = ql.Date(26, 11, 2024)
-ql.Settings.instance().evaluationDate = spot_date
+eval_date = ql.Date(18, 11, 2024)
+ql.Settings.instance().evaluationDate = eval_date
 calendar = ql.TARGET()
 
-# Bond details
+# bond characteristics
 notional = bond_characteristics["Nominal Value"]
 cap = bond_characteristics["Cap"]
 floor = bond_characteristics["Floor"]
@@ -27,13 +27,13 @@ issue_date = ql.Date(bond_characteristics["Issue Date"].day,
                      bond_characteristics["Issue Date"].year)
 maturity_date = ql.Date(29, 7, 2027)
 
-# Day counters
+# day count conventions
 day_counter_curve = ql.Actual360()
 day_counter_coupon = ql.Thirty360(ql.Thirty360.BondBasis)
 
 
-# BNP CDS data (as of 26 Nov 2024)
-base_cds_spread = 0.004921  # 49.21 bps
+# BNP CDS data (as of 18 Nov 2024 - EVALUATION)
+base_cds_spread = 0.004579  # 45.79 bps
 base_recovery_rate = 0.40   # 40%
 
 
@@ -54,7 +54,7 @@ schedule = ql.Schedule(
 # ----------------------------
 
 def get_forward_rate_safe(start, end):
-    safe_start = max(start, spot_date)
+    safe_start = max(start, eval_date)
     if safe_start >= end:
         return 0.0
     return log_cubic_curve.forwardRate(safe_start, end, day_counter_curve, ql.Simple).rate()
@@ -65,12 +65,12 @@ for i in range(len(schedule) - 1):
     start = schedule[i]
     end = schedule[i + 1]
 
-    if end <= spot_date:
+    if end <= eval_date:
         continue
 
-    if start < spot_date:
+    if start < eval_date:
         reset_date = calendar.advance(start, -settlement_lag, ql.Days)
-        start_for_fwd = reset_date if spot_date >= reset_date else spot_date
+        start_for_fwd = reset_date if eval_date >= reset_date else eval_date
     else:
         start_for_fwd = start
 
@@ -116,7 +116,7 @@ def compute_cva(cds, R, df_exposure):
     rows = []
     for _, row in df_exposure.iterrows():
         payment_date = row["Payment Date"]
-        t = day_counter_curve.yearFraction(spot_date, payment_date)
+        t = day_counter_curve.yearFraction(eval_date, payment_date)
         if t <= 0:
             continue
         exposure = row["Coupon Amount"]
@@ -145,54 +145,58 @@ base_cva, base_cva_rows = compute_cva(base_cds_spread, base_recovery_rate, df_va
 risk_free_npv = df_variable_exposure["Present Value"].sum()
 adjusted_npv = risk_free_npv - base_cva
 
-print("\n=== Base Case ===")
-print(f"Risk-free Value:      {risk_free_npv:.4f}")
-print(f"Total CVA:            {base_cva:.4f}")
-print(f"Credit-adjusted Value:{adjusted_npv:.4f}")
+def main():
+    print("\n=== Base Case ===")
+    print(f"Risk-free Value:      {risk_free_npv:.4f}")
+    print(f"Total CVA:            {base_cva:.4f}")
+    print(f"Credit-adjusted Value:{adjusted_npv:.4f}")
 
-# ----------------------------
-# 4. Sensitivity Analysis
-# ----------------------------
+    # ----------------------------
+    # 4. Sensitivity Analysis
+    # ----------------------------
 
-# CDS spread sensitivity
-cds_values = np.linspace(0.002, 0.007, 6)
-sensitivity_cds = []
+    # CDS spread sensitivity
+    cds_values = np.linspace(0.002, 0.007, 6)
+    sensitivity_cds = []
 
-for cds in cds_values:
-    cva_val, _ = compute_cva(cds, base_recovery_rate, df_variable_exposure)
-    adjusted_val = risk_free_npv - cva_val
-    sensitivity_cds.append({
-        "CDS Spread": cds,
-        "CVA": cva_val,
-        "Adjusted NPV": adjusted_val
-    })
+    for cds in cds_values:
+        cva_val, _ = compute_cva(cds, base_recovery_rate, df_variable_exposure)
+        adjusted_val = risk_free_npv - cva_val
+        sensitivity_cds.append({
+            "CDS Spread": cds,
+            "CVA": cva_val,
+            "Adjusted NPV": adjusted_val
+        })
 
-df_sens_cds = pd.DataFrame(sensitivity_cds)
-print("\nSensitivity Analysis - CDS Spread:")
-print(df_sens_cds)
+    df_sens_cds = pd.DataFrame(sensitivity_cds)
+    print("\nSensitivity Analysis - CDS Spread:")
+    print(df_sens_cds)
 
-# Recovery rate sensitivity
-recov_values = np.linspace(0.30, 0.50, 5)
-sensitivity_recov = []
+    # Recovery rate sensitivity
+    recov_values = np.linspace(0.30, 0.50, 5)
+    sensitivity_recov = []
 
-for recov in recov_values:
-    cva_val, _ = compute_cva(base_cds_spread, recov, df_variable_exposure)
-    adjusted_val = risk_free_npv - cva_val
-    sensitivity_recov.append({
-        "Recovery Rate": recov,
-        "CVA": cva_val,
-        "Adjusted NPV": adjusted_val
-    })
+    for recov in recov_values:
+        cva_val, _ = compute_cva(base_cds_spread, recov, df_variable_exposure)
+        adjusted_val = risk_free_npv - cva_val
+        sensitivity_recov.append({
+            "Recovery Rate": recov,
+            "CVA": cva_val,
+            "Adjusted NPV": adjusted_val
+        })
 
-df_sens_recov = pd.DataFrame(sensitivity_recov)
-print("\nSensitivity Analysis - Recovery Rate:")
-print(df_sens_recov)
+    df_sens_recov = pd.DataFrame(sensitivity_recov)
+    print("\nSensitivity Analysis - Recovery Rate:")
+    print(df_sens_recov)
 
-# ----------------------------
-# 5. CVA Breakdown Table
-# ----------------------------
+    # ----------------------------
+    # 5. CVA Breakdown Table
+    # ----------------------------
 
-df_cva = pd.DataFrame(base_cva_rows)
-print("\nDetailed CVA Breakdown:")
-print(df_cva[["Payment Date", "Exposure", "Discount Factor", "Survival Prob", "Default Prob", "Marginal CVA"]])
+    df_cva = pd.DataFrame(base_cva_rows)
+    print("\nDetailed CVA Breakdown:")
+    print(df_cva[["Payment Date", "Exposure", "Discount Factor", "Survival Prob", "Default Prob", "Marginal CVA"]])
+
+if __name__ == "__main__":
+    main()
 # %%

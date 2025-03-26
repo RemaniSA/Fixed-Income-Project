@@ -6,8 +6,8 @@ from q3 import build_curves
 
 # --- Setup ---
 log_cubic_curve = build_curves()["Log-Cubic"]
-spot_date = ql.Date(26, 11, 2024)  # same as eval_date
-ql.Settings.instance().evaluationDate = spot_date
+eval_date = ql.Date(18, 11, 2024)  # same as eval_date
+ql.Settings.instance().evaluationDate = eval_date
 calendar = ql.TARGET()
 convention = ql.ModifiedFollowing
 frequency = ql.Quarterly
@@ -35,7 +35,7 @@ day_counter_coupon = ql.Thirty360(ql.Thirty360.BondBasis)
 # --- Safe forward rate helper ---
 def get_forward_rate(start, end):
     # Ensure we're not asking for forward rates before the curve starts
-    safe_start = max(start, spot_date)
+    safe_start = max(start, eval_date)
     if safe_start >= end:
         return 0.0
     return log_cubic_curve.forwardRate(safe_start, end, day_counter_curve, ql.Simple).rate()
@@ -47,13 +47,13 @@ for i in range(len(schedule) - 1):
     start = schedule[i]
     end = schedule[i + 1]
 
-    if end <= spot_date:
+    if end <= eval_date:
         continue
 
     # Use reset date if we're in the current coupon period
-    if start < spot_date:
+    if start < eval_date:
         reset_date = calendar.advance(start, -settlement_lag, ql.Days)
-        start_for_fwd = reset_date if spot_date >= reset_date else spot_date
+        start_for_fwd = reset_date if eval_date >= reset_date else eval_date
     else:
         start_for_fwd = start
 
@@ -92,26 +92,30 @@ accrued = 0.0
 for i in range(len(schedule) - 1):
     start = schedule[i]
     end = schedule[i + 1]
-    if start < spot_date <= end:
+    if start < eval_date <= end:
         reset_date = calendar.advance(start, -settlement_lag, ql.Days)
-        start_for_fwd = reset_date if spot_date >= reset_date else spot_date
+        start_for_fwd = reset_date if eval_date >= reset_date else eval_date
         fwd_rate = get_forward_rate(start_for_fwd, end)
         effective_rate = min(max(fwd_rate, floor), cap)
-        yf_accrued = day_counter_coupon.yearFraction(start, spot_date)
+        yf_accrued = day_counter_coupon.yearFraction(start, eval_date)
         accrued = notional * effective_rate * yf_accrued
         break
 
 # --- Prices ---
-gross_price = coupon_table["Present Value"].sum()
-clean_price = gross_price - accrued
+model_gross_price = coupon_table["Present Value"].sum()
+model_clean_price = model_gross_price - accrued
 
-# --- Output ---
-print("\nQ8: Forward Rate-Based Coupon Table (Including Redemption)")
-print(coupon_table)
+def main():
+    # --- Output ---
+    print("\nQ8: Forward Rate-Based Coupon Table (Including Redemption)")
+    print(coupon_table)
 
-print("\nBond Pricing Summary:")
-print(f"Gross Price (Dirty): {round(gross_price, 4)}")
-print(f"Accrued Interest:    {round(accrued, 4)}")
-print(f"Clean Price:         {round(clean_price, 4)}")
+    print("\nBond Pricing Summary:")
+    print(f"Gross Price (Dirty): {round(model_gross_price, 4)}")
+    print(f"Accrued Interest:    {round(accrued, 4)}")
+    print(f"Clean Price:         {round(model_clean_price, 4)}")
+
+if __name__ == "__main__":
+    main()
 
 # %%
