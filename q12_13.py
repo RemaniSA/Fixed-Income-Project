@@ -1,6 +1,4 @@
 import QuantLib as ql
-import numpy as np
-import pandas as pd
 
 from q1 import bond_characteristics
 from q3 import build_curves
@@ -43,14 +41,9 @@ bond_schedule = ql.Schedule(
     False
 )
 
-# Create the index for the floating rate coupon.
-# Since the coupon is "3M Euribor", we use Euribor3M.
-# We'll create a dummy yield curve here; later, when pricing the bond, we attach the current yield curve.
-dummy_curve = ql.FlatForward(trade_date, 0.02, ql.Actual365Fixed())  # Dummy 2% flat curve
-dummy_handle = ql.YieldTermStructureHandle(dummy_curve)
-euribor3m = ql.Euribor3M(dummy_handle)
 
-# Set parameters for the FloatingRateBond:
+
+# Parameters for the FloatingRateBond:
 # - settlementDays: from bond_characteristics
 # - faceAmount: Nominal Value
 # - schedule: bond_schedule
@@ -65,27 +58,6 @@ euribor3m = ql.Euribor3M(dummy_handle)
 # - inArrears: False
 # - redemption: 100 (since the nominal is 1000 and redemption "At Par", we use 100% of par)
 # - issueDate: issue_date
-
-bond = ql.FloatingRateBond(
-    settlementDays=settlement_days,
-    faceAmount=bond_characteristics['Nominal Value'],
-    schedule=bond_schedule,
-    index=euribor3m,
-    paymentDayCounter=ql.Thirty360(ql.Thirty360.BondBasis),
-    paymentConvention=ql.ModifiedFollowing,
-    fixingDays=2,
-    gearings=[1.0],
-    spreads=[0.0],
-    caps=[bond_characteristics['Cap']],
-    floors=[bond_characteristics['Floor']],
-    inArrears=False,
-    redemption=100.0,   # 100% of par
-    issueDate=issue_date
-)
-
-pricer = ql.BlackIborCouponPricer()
-# 💡 Add this line to set the pricer for the floating coupons
-ql.setCouponPricer(bond.cashflows(), pricer)
 
 # =============================================================================
 # 5. Functions to Compute DV01 for a Swap and a Bond (using finite differences)
@@ -121,7 +93,7 @@ def compute_bond_dv01(bond, original_curve, bump=1e-4):
 # =============================================================================
 
 nominal = bond_characteristics['Nominal Value']  # Notional amount
-fixed_rate = 0.025 # Fixed rate payment
+fixed_rate = 0.02202 # Fixed rate payment
 
 # Define swap start and maturity dates (5-year swap)
 start_date = issue_date
@@ -139,7 +111,6 @@ floating_schedule = ql.Schedule(
     ql.DateGeneration.Forward, False
 )
 
-
 # =============================================================================
 # 6. Loop Over Each Yield Curve: Price the Bond & Swap, Compute DV01s, and Determine Hedge Ratio
 # =============================================================================
@@ -152,6 +123,31 @@ print("-------------------------------------------------------------------------
 for curve_name, curve in curves.items():
     # Create a YieldTermStructureHandle for the current curve.
     yc_handle = ql.YieldTermStructureHandle(curve)
+
+    # Use this handle to construct the floating index
+    euribor3m = ql.Euribor3M(yc_handle)
+
+    # Rebuild the FloatingRateBond with euribor3m as the index
+    bond = ql.FloatingRateBond(
+        settlementDays=settlement_days,
+        faceAmount=bond_characteristics['Nominal Value'],
+        schedule=bond_schedule,
+        index=euribor3m,  # <-- no dummy
+        paymentDayCounter=ql.Thirty360(ql.Thirty360.BondBasis),
+        paymentConvention=ql.ModifiedFollowing,
+        fixingDays=2,
+        gearings=[1.0],
+        spreads=[0.0],
+        caps=[bond_characteristics['Cap']],
+        floors=[bond_characteristics['Floor']],
+        inArrears=False,
+        redemption=100.0,
+        issueDate=issue_date
+    )
+
+    # Set a pricer for the floating coupons (e.g. Black pricer)
+    pricer = ql.BlackIborCouponPricer()
+    ql.setCouponPricer(bond.cashflows(), pricer)
     
     # ---------------------------
     # 6.1 Bond Pricing & DV01 Computation
