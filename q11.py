@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from q1 import bond_characteristics
 from q3 import build_curves
+from q3 import date_strings
 
 # --- Shift Helpers ---
 def apply_parallel_shift(rates, shift_bps=10):
@@ -153,8 +154,8 @@ for title, group_labels in plot_groups.items():
     plt.title(f"Spot Rate Curves – {title}")
     plt.ylabel("Zero Rate (%)")
     plt.xlabel("Maturity Date")
-    plt.xticks(rotation=45)
-    plt.grid(True)
+    plt.xticks(date_strings[::5],rotation=45)
+    plt.grid(axis='y')
     plt.legend()
     plt.tight_layout()
     plt.show()
@@ -170,8 +171,8 @@ for title, group_labels in plot_groups.items():
     plt.title(f"Spot Rate Curves – {title}")
     plt.ylabel("Zero Rate (%)")
     plt.xlabel("Maturity Date")
-    plt.xticks(rotation=45)
-    plt.grid(True)
+    plt.xticks(date_strings[::5],rotation=45)
+    plt.grid(axis='y')
     plt.legend()
     plt.tight_layout()
     plt.show()
