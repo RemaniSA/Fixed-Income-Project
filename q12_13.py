@@ -1,7 +1,9 @@
 import QuantLib as ql
+import pandas as pd
 
 from q1 import bond_characteristics
 from q3 import build_curves
+from q11 import shifted_curves, make_zero_curve, apply_parallel_shift, apply_slope_shift, apply_curvature_shift, df_prices
 
 # =============================================================================
 # 1. Set Evaluation Date Based on Trade Date
@@ -12,9 +14,30 @@ trade_date = ql.Date(bond_characteristics['Trade Date'].day,
 ql.Settings.instance().evaluationDate = trade_date
 
 # =============================================================================
-# 2. Construct Multiple Yield Curves Using Different Interpolation Methods
+# 2. Get shifted curves (already discount curves from question 11)
 # =============================================================================
-curves = build_curves()
+calendar = ql.TARGET()
+day_counter_curve = ql.Actual360()
+day_counter_coupon = ql.Thirty360(ql.Thirty360.BondBasis)
+base_curve = build_curves()["Log-Cubic"]
+eval_date = ql.Date(18, 11, 2024)
+end_date = calendar.advance(eval_date, ql.Period(60, ql.Years))
+n_points = 100    # number of points on the curve
+dates = [eval_date + ql.Period(int(i * (end_date.serialNumber() - eval_date.serialNumber()) / n_points), ql.Days)
+         for i in range(n_points + 1)] # evaluation dates
+base_rates = [base_curve.zeroRate(d, day_counter_curve, ql.Continuous).rate() for d in dates]
+base_points = 1
+
+# Build shifted curves
+shifted_curves = {
+    "Base": base_curve,
+    "Parallel +10bps": make_zero_curve(dates, apply_parallel_shift(base_rates, base_points), calendar, day_counter_curve),
+    "Parallel -10bps": make_zero_curve(dates, apply_parallel_shift(base_rates, -base_points), calendar, day_counter_curve),
+    "Slope +10bps": make_zero_curve(dates, apply_slope_shift(base_rates, base_points), calendar, day_counter_curve),
+    "Slope -10bps": make_zero_curve(dates, apply_slope_shift(base_rates, -base_points), calendar, day_counter_curve),
+    "Curvature +10bps": make_zero_curve(dates, apply_curvature_shift(base_rates, 0.0001), calendar, day_counter_curve),
+    "Curvature -10bps": make_zero_curve(dates, apply_curvature_shift(base_rates, -0.0001), calendar, day_counter_curve),
+}
 
 # =============================================================================
 # 3. Bond Setup: Construct a Floating-Rate Bond with Cap and Floor
@@ -28,8 +51,7 @@ maturity_date_bond = ql.Date(bond_characteristics['Maturity Date'].day,
                              bond_characteristics['Maturity Date'].year)
 settlement_days = bond_characteristics['Settlement Lag']
 
-# For a floating rate bond, we need a schedule.
-# Since the bond pays 4 times per year, we use Quarterly frequency.
+# Create a coupon schedule for the floating rate bond (Quarterly frequency)
 bond_schedule = ql.Schedule(
     issue_date,
     maturity_date_bond,
@@ -41,75 +63,95 @@ bond_schedule = ql.Schedule(
     False
 )
 
-
-
-# Parameters for the FloatingRateBond:
-# - settlementDays: from bond_characteristics
-# - faceAmount: Nominal Value
-# - schedule: bond_schedule
-# - index: euribor3m
-# - paymentDayCounter: Using Thirty360 based on the bond's conventions (Days in Month=30, Days in Year=360)
-# - paymentConvention: Modified Following
-# - fixingDays: We'll assume 2 (typical for Euribor)
-# - gearings: [1.0] (no gearing)
-# - spreads: [0.0] (no spread)
-# - caps: [bond_characteristics['Cap']]
-# - floors: [bond_characteristics['Floor']]
-# - inArrears: False
-# - redemption: 100 (since the nominal is 1000 and redemption "At Par", we use 100% of par)
-# - issueDate: issue_date
-
 # =============================================================================
 # 5. Functions to Compute DV01 for a Swap and a Bond (using finite differences)
 # =============================================================================
-def compute_dv01(swap, original_curve, bump=1e-4):
-    """Compute DV01 for a swap by bumping the yield curve by 1 basis point."""
-    original_npv = swap.NPV()
-    bumped_rates = [original_curve.zeroRate(date, ql.Actual365Fixed(), ql.Continuous).rate() + bump
-                    for date in original_curve.dates()]
-    bumped_curve = ql.ZeroCurve(original_curve.dates(), bumped_rates, ql.Actual365Fixed())
-    bumped_handle = ql.YieldTermStructureHandle(bumped_curve)
-    swap.setPricingEngine(ql.DiscountingSwapEngine(bumped_handle))
-    bumped_npv = swap.NPV()
-    dv01 = (bumped_npv - original_npv) / bump
-    return dv01
-
-def compute_bond_dv01(bond, original_curve, bump=1e-4):
-    """Compute DV01 for a bond by bumping the yield curve by 1 basis point."""
-    yc_handle = ql.YieldTermStructureHandle(original_curve)
-    bond.setPricingEngine(ql.DiscountingBondEngine(yc_handle))
-    original_price = bond.cleanPrice()
-    bumped_rates = [original_curve.zeroRate(date, ql.Actual365Fixed(), ql.Continuous).rate() + bump
-                    for date in original_curve.dates()]
-    bumped_curve = ql.ZeroCurve(original_curve.dates(), bumped_rates, ql.Actual365Fixed())
-    bumped_handle = ql.YieldTermStructureHandle(bumped_curve)
-    bond.setPricingEngine(ql.DiscountingBondEngine(bumped_handle))
-    bumped_price = bond.cleanPrice()
-    dv01 = (bumped_price - original_price) / bump
+def compute_dv01(down_shift, up_shift):
+    dv01 = (down_shift - up_shift) / 2
     return dv01
 
 # =============================================================================
-# Swap Setup: Define a plain vanilla swap to be priced using each yield curve.
+# 3. Manual Swap Pricing Function
 # =============================================================================
+def compute_swap_prices(curve, fixed_schedule, notional, fixed_rate, day_counter, eval_date):
+    """
+    Computes the swap price manually using discount factors from the provided curve.
+    
+    The method is as follows:
+      - Fixed leg PV is calculated by summing the discounted fixed coupon payments
+        for all payment dates after the evaluation date.
+      - Floating leg PV is approximated by: Notional * (1 - DF(final_payment_date))
+      - Swap NPV = Floating PV - Fixed PV.
+      - Gross Price is defined as: Notional + Swap NPV.
+      - Accrued Interest on the fixed leg is computed as the fraction of the fixed coupon
+        accrued from the last payment date to the evaluation date.
+      - Clean Price = Gross Price - Accrued Interest.
+    
+    Returns a tuple (gross_price, accrued_interest, clean_price).
+    """
+    # Convert the fixed schedule into a list of dates.
+    fixed_dates = list(fixed_schedule)
 
+    # ----- Fixed Leg PV Calculation -----
+    fixed_leg_PV = 0.0
+    for i in range(1, len(fixed_dates)):
+        payment_date = fixed_dates[i]
+        if payment_date > eval_date:
+            # The accrual factor for the coupon period:
+            period = day_counter.yearFraction(fixed_dates[i-1], payment_date)
+            payment = notional * fixed_rate * period
+            # Discount the payment using the provided curve:
+            df = curve.discount(payment_date)
+            fixed_leg_PV += payment * df
+
+    # ----- Floating Leg PV Calculation -----
+    # Under the assumption of a par-reset swap:
+    final_date = fixed_dates[-1]
+    PV_floating = notional * (1 - curve.discount(final_date))
+
+    # ----- Swap NPV & Gross Price -----
+    swap_NPV = PV_floating - fixed_leg_PV
+    gross_price = notional + swap_NPV
+
+    # ----- Accrued Interest Calculation on Fixed Leg -----
+    # Find the last coupon date that is on or before eval_date.
+    last_coupon_date = None
+    for d in fixed_dates:
+        if d <= eval_date:
+            last_coupon_date = d
+        else:
+            break
+    accrued = 0.0
+    if last_coupon_date is not None and last_coupon_date != fixed_dates[-1]:
+        # Compute fraction of the period elapsed:
+        fraction = day_counter.yearFraction(last_coupon_date, eval_date)
+        accrued = notional * fixed_rate * fraction
+
+    # ----- Clean Price -----
+    clean_price = gross_price - accrued
+    return gross_price, accrued, clean_price
+
+# =============================================================================
+# 4. Loop Over Shifted Curves to Build the Swap Price Table
+# =============================================================================
 nominal = bond_characteristics['Nominal Value']  # Notional amount
-fixed_rate = 0.02202 # Fixed rate payment
+fixed_rate = 0.02202  # Fixed rate payment
+day_counter_fixed = ql.Actual360()
 
-# Define swap start and maturity dates (5-year swap)
-start_date = issue_date
-maturity_date = maturity_date_bond
+rows = []
+for scenario, curve in shifted_curves.items():
+    gross, accrued, clean = compute_swap_prices(curve, bond_schedule, nominal, fixed_rate, day_counter_fixed, eval_date)
+    rows.append({
+        "Interpolation Method": scenario,
+        "Gross Price": round(gross, 4),
+        "Accrued Interest": round(accrued, 4),
+        "Clean Price": round(clean, 4)
+    })
 
-# Build schedules for the fixed and floating legs.
-fixed_schedule = ql.Schedule(
-    start_date, maturity_date, ql.Period(ql.Annual),
-    ql.TARGET(), ql.ModifiedFollowing, ql.ModifiedFollowing,
-    ql.DateGeneration.Forward, False
-)
-floating_schedule = ql.Schedule(
-    start_date, maturity_date, ql.Period(ql.Semiannual),
-    ql.TARGET(), ql.ModifiedFollowing, ql.ModifiedFollowing,
-    ql.DateGeneration.Forward, False
-)
+df_swap_prices = pd.DataFrame(rows)
+df_swap_prices.set_index("Interpolation Method", inplace=True)
+print(df_prices)
+print(df_swap_prices)
 
 # =============================================================================
 # 6. Loop Over Each Yield Curve: Price the Bond & Swap, Compute DV01s, and Determine Hedge Ratio
@@ -117,87 +159,19 @@ floating_schedule = ql.Schedule(
 
 print("Comparison of Bond and Swap DV01s Using Different Yield Curves:")
 print("----------------------------------------------------------------------------------------------")
-print("{:<25} {:>12} {:>15} {:>15} {:>20}".format("Interpolation Method", "Bond Price", "Bond DV01", "Swap DV01", "Hedge Notional"))
+print("{:<25} {:>15} {:>15} {:>20}".format("Interpolation Method", "Bond DV01", "Swap DV01", "Hedge Ratio"))
 print("----------------------------------------------------------------------------------------------")
 
-for curve_name, forward_curve in curves.items():
-    # Create a handle for the forward curve
-    forward_handle = ql.YieldTermStructureHandle(forward_curve)
-    
-    # -------------------------------------------------------------------------
-    # 1. Build a discount curve from the forward curve
-    # -------------------------------------------------------------------------
-    # Retrieve the dates from the forward curve (these should cover the maturities of interest)
-    dates = forward_curve.dates()
-    # Get the day counter from the forward curve; if not available, you can default to Actual365Fixed
-    try:
-        day_counter = forward_curve.dayCounter()
-    except AttributeError:
-        day_counter = ql.Actual365Fixed()
-    # Compute discount factors at each date from the forward curve
-    discount_factors = [forward_curve.discount(date) for date in dates]
-    # Build a discount curve using these dates and discount factors
-    discount_curve = ql.DiscountCurve(dates, discount_factors, day_counter)
-    discount_handle = ql.YieldTermStructureHandle(discount_curve)
-    
-    # -------------------------------------------------------------------------
-    # 2. Build the floating index using the forward curve (for projecting coupons)
-    # -------------------------------------------------------------------------
-    euribor3m = ql.Euribor3M(forward_handle)
-    
-    # Re-create the bond for this curve iteration with the new index.
-    # (Reinstantiating the bond is safest because the index is set at construction.)
-    bond = ql.FloatingRateBond(
-        settlementDays=settlement_days,
-        faceAmount=bond_characteristics['Nominal Value'],
-        schedule=bond_schedule,
-        index=euribor3m,  # Use forward curve for forecasting
-        paymentDayCounter=ql.Thirty360(ql.Thirty360.BondBasis),
-        paymentConvention=ql.ModifiedFollowing,
-        fixingDays=2,
-        gearings=[1.0],
-        spreads=[0.0],
-        caps=[bond_characteristics['Cap']],
-        floors=[bond_characteristics['Floor']],
-        inArrears=False,
-        redemption=100.0,
-        issueDate=issue_date
-    )
-    pricer = ql.BlackIborCouponPricer()
-    ql.setCouponPricer(bond.cashflows(), pricer)
-    
-    # Use the discount curve for pricing
-    bond.setPricingEngine(ql.DiscountingBondEngine(discount_handle))
-    bond_price = bond.cleanPrice()
-    # Compute bond DV01 using the discount curve
-    bond_dv01 = compute_bond_dv01(bond, discount_curve)
-    
-    # -------------------------------------------------------------------------
-    # 3. Construct the Swap using the forward curve for the floating leg and the discount curve for discounting
-    # -------------------------------------------------------------------------
-    # Determine swap type based on bond DV01
-    if bond_dv01 < 0:
-        swap_type = ql.VanillaSwap.Payer
-    else:
-        swap_type = ql.VanillaSwap.Receiver
-    
-    # Rebuild the floating leg index (using the forward curve)
-    euribor_index = ql.Euribor6M(forward_handle)
-    swap = ql.VanillaSwap(
-        swap_type,
-        bond_characteristics['Nominal Value'],  # Notional amount
-        fixed_schedule, fixed_rate, ql.Thirty360(ql.Thirty360.BondBasis),
-        floating_schedule, euribor_index, 0.0, ql.Actual360()
-    )
-    # Use the discount curve for discounting the swap cash flows
-    swap_engine = ql.DiscountingSwapEngine(discount_handle)
-    swap.setPricingEngine(swap_engine)
-    
-    swap_npv = swap.NPV()
-    swap_dv01 = compute_dv01(swap, discount_curve)
-    
-    # Calculate hedge notional as the ratio of DV01s (absolute values)
-    hedge_notional = abs(bond_dv01) / abs(swap_dv01) if swap_dv01 != 0 else float('inf')
-    
-    # Print the results for this curve
-    print("{:<25} {:>12.2f} {:>15.2f} {:>15.2f} {:>20.0f}".format(curve_name, bond_price, bond_dv01, swap_dv01, hedge_notional))
+for i in range(1, 6, 2):
+    bond_dv01 = compute_dv01(df_prices.iloc[i+1]['Gross Price'], df_prices.iloc[i]['Gross Price'])
+    swap_dv01 = compute_dv01(df_swap_prices.iloc[i+1]['Gross Price'], df_swap_prices.iloc[i]['Gross Price'])
+
+    if swap_dv01 != 0:
+        hedge_ratio = abs(bond_dv01) / abs(swap_dv01)
+    else:    
+        hedge_ratio = float('inf')
+
+    print("{:<25} {:>15.6f} {:>15.6f} {:>20.6f}".format(df_prices.index[i], bond_dv01, swap_dv01, hedge_ratio))
+
+# to use DV01 we can only use a shift of 1bps by definition
+# dv01 = (down - up / 2)
