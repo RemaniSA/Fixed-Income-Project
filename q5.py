@@ -140,8 +140,14 @@ def make_engine(vol):
         shift
     )
 
-fixing_date = eval_date  # since our data is our Eval Date
-index.addFixing(fixing_date, cap_rate)
+
+# Get the fixing date from the first coupon of the float leg
+for cf in float_leg:
+    if isinstance(cf, ql.IborCoupon):
+        fixing_date = cf.fixingDate()
+        print(f"Adding fixing for: {fixing_date}")  # optional debug
+        index.addFixing(fixing_date, cap_rate)  # assuming cap_rate is the correct one to use
+        break  # only need to fix the first coupon
 
 cap.setPricingEngine(make_engine(vol_cap))
 floor.setPricingEngine(make_engine(vol_floor))
@@ -149,9 +155,9 @@ floor.setPricingEngine(make_engine(vol_floor))
 npv_cap = cap.NPV()
 npv_floor = floor.NPV()
 
-# ----------------------------
-# 5. results
-# ----------------------------
+# # ----------------------------
+# # 5. results
+# # ----------------------------
 
 print(f"cap leg NPV (short):  {-npv_cap:.4f}")
 print(f"floor leg NPV (long): {npv_floor:.4f}")
