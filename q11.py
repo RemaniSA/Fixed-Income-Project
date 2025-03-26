@@ -1,4 +1,4 @@
-#%%
+
 #%%
 import QuantLib as ql
 import numpy as np
@@ -11,13 +11,13 @@ from q3 import build_curves
 def apply_parallel_shift(rates, shift_bps=10):
     return [r + shift_bps / 10000 for r in rates]
 
-def apply_slope_shift(rates):
+def apply_slope_shift(rates, shift_bps=10):
     n = len(rates)
-    return [r + (0.001 * (2 * i / n - 1)) for i, r in enumerate(rates)]  # -10bps to +10bps
+    return [r + (shift_bps / 10000 * (2 * i / n - 1)) for i, r in enumerate(rates)]
 
-def apply_curvature_shift(rates):
+def apply_curvature_shift(rates, bump=0.001):
     n = len(rates)
-    mid, width, bump = n // 2, n // 4, 0.001
+    mid, width = n // 2, n // 4
     return [r + bump * np.exp(-((i - mid)**2) / (2 * width**2)) for i, r in enumerate(rates)]
 
 def make_zero_curve(dates, shifted_rates, calendar, day_counter):
@@ -34,17 +34,29 @@ day_counter_coupon = ql.Thirty360(ql.Thirty360.BondBasis)
 
 # Load base curve
 base_curve = build_curves()["Log-Cubic"]
-dates = base_curve.dates()
+# dates = base_curve.dates()
+eval_date = ql.Date(18, 11, 2024)
+end_date = calendar.advance(eval_date, ql.Period(60, ql.Years))
+n_points = 100    # number of points on the curve
+dates = [eval_date + ql.Period(int(i * (end_date.serialNumber() - eval_date.serialNumber()) / n_points), ql.Days)
+         for i in range(n_points + 1)] # evaluation dates
 date_labels = [d.ISO() for d in dates]
 base_rates = [base_curve.zeroRate(d, day_counter_curve, ql.Continuous).rate() for d in dates]
 base_dfs = [base_curve.discount(d) for d in dates]
 
+plt.figure(figsize=(12, 6),dpi=250)
+plt.plot(date_labels, base_rates)
+plt.show()
+
 # Build shifted curves
 shifted_curves = {
     "Base": base_curve,
-    "Parallel +10bps": make_zero_curve(dates, apply_parallel_shift(base_rates), calendar, day_counter_curve),
-    "Slope +10bps": make_zero_curve(dates, apply_slope_shift(base_rates), calendar, day_counter_curve),
-    "Curvature +10bps": make_zero_curve(dates, apply_curvature_shift(base_rates), calendar, day_counter_curve)
+    "Parallel +10bps": make_zero_curve(dates, apply_parallel_shift(base_rates, 10), calendar, day_counter_curve),
+    "Parallel -10bps": make_zero_curve(dates, apply_parallel_shift(base_rates, -10), calendar, day_counter_curve),
+    "Slope +10bps": make_zero_curve(dates, apply_slope_shift(base_rates, 10), calendar, day_counter_curve),
+    "Slope -10bps": make_zero_curve(dates, apply_slope_shift(base_rates, -10), calendar, day_counter_curve),
+    "Curvature +10bps": make_zero_curve(dates, apply_curvature_shift(base_rates, 0.001), calendar, day_counter_curve),
+    "Curvature -10bps": make_zero_curve(dates, apply_curvature_shift(base_rates, -0.001), calendar, day_counter_curve),
 }
 
 # --- Bond Characteristics ---
@@ -124,35 +136,46 @@ df_prices = pd.DataFrame(price_summary).T
 print("\n📊 Bond Price Sensitivity Summary:")
 print(df_prices)
 
-# --- Plot Spot Rate Curves ---
-plt.figure(figsize=(12, 6), dpi=150)
-for name, curve in shifted_curves.items():
-    rates = [curve.zeroRate(d, day_counter_curve, ql.Continuous).rate() * 100 for d in dates]
-    plt.plot(date_labels, rates, label=name)
-plt.title("Spot Rate Curves: Original vs Shifted")
-plt.ylabel("Zero Rate (%)")
-plt.xlabel("Maturity Date")
-plt.xticks(rotation=45)
-plt.grid(True)
-plt.legend()
-plt.tight_layout()
-plt.show()
+plot_groups = {
+    "Parallel Shift": ["Base", "Parallel +10bps", "Parallel -10bps"],
+    "Slope Shift": ["Base", "Slope +10bps", "Slope -10bps"],
+    "Curvature Shift": ["Base", "Curvature +10bps", "Curvature -10bps"]
+}
 
-# --- Plot Discount Factor Curves ---
-plt.figure(figsize=(12, 6), dpi=150)
-for name, curve in shifted_curves.items():
-    dfs = [curve.discount(d) for d in dates]
-    plt.plot(date_labels, dfs, label=name)
-plt.title("Discount Factor Curves: Original vs Shifted")
-plt.ylabel("Discount Factor")
-plt.xlabel("Maturity Date")
-plt.xticks(rotation=45)
-plt.grid(True)
-plt.legend()
-plt.tight_layout()
-plt.show()
+for title, group_labels in plot_groups.items():
+    plt.figure(figsize=(10, 5), dpi=150)
+    for name in group_labels:
+        curve = shifted_curves[name]
+        rates = [curve.zeroRate(d, day_counter_curve, ql.Continuous).rate() * 100 for d in dates]
+        linestyle = '-' if name == "Base" else '--' if "+10bps" in name else '-.'
+        plt.plot(date_labels, rates, label=name, linestyle=linestyle)
 
-# --- Save Output ---
-df_prices.to_csv("q11_bond_price_sensitivity.csv")
+    plt.title(f"Spot Rate Curves – {title}")
+    plt.ylabel("Zero Rate (%)")
+    plt.xlabel("Maturity Date")
+    plt.xticks(rotation=45)
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+for title, group_labels in plot_groups.items():
+    plt.figure(figsize=(10, 5), dpi=150)
+    for name in group_labels:
+        curve = shifted_curves[name]
+        rates = [curve.zeroRate(d, day_counter_curve, ql.Continuous).rate() * 100 for d in dates]
+        linestyle = '-' if name == "Base" else '--' if "+10bps" in name else '-.'
+        plt.plot(date_labels, rates, label=name, linestyle=linestyle)
+
+    plt.title(f"Spot Rate Curves – {title}")
+    plt.ylabel("Zero Rate (%)")
+    plt.xlabel("Maturity Date")
+    plt.xticks(rotation=45)
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+    
+
 
 #%%
