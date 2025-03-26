@@ -37,9 +37,9 @@ slope_sens = (shiftsens.loc["Slope -10bps", "Clean Price"] - shiftsens.loc["Slop
 curv_sens = (shiftsens.loc["Curvature -10bps", "Clean Price"] - shiftsens.loc["Curvature +10bps", "Clean Price"]) / 2 / 10
 
 print(f"Parallel DV01: {dv01:.6f}")
-print(f"Parallel DV01: {dv01:.6f}")
 print(f"Slope Sensitivity:     {slope_sens:.6f} per 1bp")
 print(f"Curvature Sensitivity: {curv_sens:.6f} per 1bp")
+print(f"CDS Sensitivity {beta_cds:.6f} per 1bp")
 #%%
 # Given variances
 var_l = 0.022
@@ -76,6 +76,7 @@ PnL = -delta_GP  # Loss
 VaR_mc = np.percentile(PnL, 1)
 ES_mc = PnL[PnL >= VaR_mc].mean()
 
+
 # === QUESTION 17 ===
 # Analytical (exact) VaR & ES using normal distribution
 # Total variance of delta_GP
@@ -88,7 +89,7 @@ std_total = np.sqrt(total_var)
 # Normal 99% quantile
 z_99 = norm.ppf(0.01)
 VaR_exact = z_99 * std_total
-ES_exact = std_total * norm.pdf(z_99) / 0.01
+ES_exact = std_total * norm.pdf(z_99)
 
 # === QUESTION 18 ===
 # Marginal VaR is proportional to beta_i * std_i / std_total
