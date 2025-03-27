@@ -34,19 +34,20 @@ issue_date = ql.Date(bond_characteristics["Issue Date"].day,
 maturity_date = ql.Date(29, 7, 2027)
 day_counter = ql.Thirty360(ql.Thirty360.BondBasis)
 eval_date = ql.Settings.instance().evaluationDate
-coupon_date = ql.Date(29, 1, 2025)
+# coupon_date = ql.Date(29, 1, 2025)
 
 # -----------------
-# 2. build schedule
+# 2. build schedule (patched)
 # ------------------
 
 schedule = ql.Schedule(
-    max(issue_date, coupon_date), maturity_date,
+    issue_date, maturity_date,
     ql.Period(frequency),
     calendar,
     convention, convention,
     ql.DateGeneration.Forward, False
 )
+
 
 # -----------------
 # 3. helper to build cash flows
@@ -54,36 +55,45 @@ schedule = ql.Schedule(
 
 def generate_cashflows(rate):
     """
-    Generates a DataFrame of cashflows for a given coupon rate.
-
-    Args:
-        rate (float): The annual coupon rate as a decimal (e.g., 0.05 for 5%).
-
-    Returns:
-        pandas.DataFrame: A DataFrame containing the following columns:
-            - "Start Date": The start date of the cashflow period.
-            - "End Date": The end date of the cashflow period.
-            - "Year Fraction": The year fraction between the start and end dates.
-            - "Coupon Rate (%)": The coupon rate expressed as a percentage.
-            - "Coupon Amount": The coupon payment for the period.
-            - "Discount Factor": The discount factor for the end date.
-            - "PV": The present value of the coupon payment.
+    Generates a DataFrame of cashflows for a given coupon rate,
+    including final coupon and notional repayment at maturity.
     """
     cashflows = []
+
     for i in range(len(schedule) - 1):
         start = schedule[i]
         end = schedule[i + 1]
+
+        if end < eval_date:
+            continue  # skip past cash flows
+
         yf = day_counter.yearFraction(start, end)
         cpn = notional * rate * yf
+        discount = df_curve.discount(end)
+
         cashflows.append({
             "Start Date": start,
             "End Date": end,
             "Year Fraction": yf,
             "Coupon Rate (%)": rate * 100,
             "Coupon Amount": cpn,
-            "Discount Factor": df_curve.discount(end),
-            "PV": cpn * df_curve.discount(end)
-        })
+            "Discount Factor": discount,
+            "PV": cpn * discount
+    })
+
+
+    # # Add notional redemption at maturity
+    # discount_redemption = df_curve.discount(maturity_date)
+    # cashflows.append({
+    #     "Start Date": maturity_date,
+    #     "End Date": maturity_date,
+    #     "Year Fraction": 0.0,
+    #     "Coupon Rate (%)": None,
+    #     "Coupon Amount": notional,
+    #     "Discount Factor": discount_redemption,
+    #     "PV": notional * discount_redemption
+    # })
+
     return pd.DataFrame(cashflows)
 
 # ------------------
@@ -97,7 +107,14 @@ df_worst = generate_cashflows(floor)
 # 5. main script block
 # ------------------
 
-def main():
+
+if __name__=='__main__':
+    def filter_coupon_only(df):
+        return df[df["Coupon Amount"] < bond_characteristics["Nominal Value"]].copy()
+
+    df_best_coupons = filter_coupon_only(df_best)
+    df_worst_coupons = filter_coupon_only(df_worst)
+
 
     npv_best = df_best["PV"].sum()
     npv_worst = df_worst["PV"].sum()
@@ -106,7 +123,7 @@ def main():
     print("worst case NPV (floor rate):", round(npv_worst, 4))
 
     # plot coupon comparison
-    labels = [end.to_date() for end in df_best["Start Date"]]
+    labels = [end.to_date() for end in df_best["End Date"]]
     x = np.arange(len(labels))
     width = 0.4
 
@@ -129,11 +146,5 @@ def main():
     print("\nWorst Case cash flows (floor rate):")
     print(df_worst[["Start Date", "End Date", "Coupon Rate (%)", "Coupon Amount", "Discount Factor", "PV"]])
 
-# ------------------
-# 6. guard
-# ------------------
-
-if __name__ == "__main__":
-    main()
 
 # %%

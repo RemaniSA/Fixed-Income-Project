@@ -1,7 +1,5 @@
 #%%
-# TODO: The forward-implied coupon rate,
-# How much credit risk reduces the expected rate,
-# And the survival-adjusted perspective coupon rate.
+
 # %%
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -17,11 +15,11 @@ def filter_coupon_only(df):
 df_best_coupons = filter_coupon_only(df_best)
 df_worst_coupons = filter_coupon_only(df_worst)
 df_realistic_coupons = df_variable_exposure[df_variable_exposure["Coupon Amount"] < bond_characteristics["Nominal Value"]].copy()
-df_realistic_coupons = df_realistic_coupons.iloc[:-1]
+# df_realistic_coupons = df_realistic_coupons.iloc[:-1]
 
 # Ensure Payment Date is datetime for sorting and plotting
-df_best_coupons["Payment Date"] = df_best_coupons["Start Date"].apply(lambda d: d.to_date())
-df_worst_coupons["Payment Date"] = df_worst_coupons["Start Date"].apply(lambda d: d.to_date())
+df_best_coupons["Payment Date"] = df_best_coupons["End Date"].apply(lambda d: d.to_date())
+df_worst_coupons["Payment Date"] = df_worst_coupons["End Date"].apply(lambda d: d.to_date())
 df_realistic_coupons["Payment Date"] = df_realistic_coupons["Payment Date"].apply(lambda d: d.to_date())
 
 # Merge into single DataFrame
