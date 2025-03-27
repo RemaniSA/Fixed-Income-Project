@@ -34,13 +34,14 @@ issue_date = ql.Date(bond_characteristics["Issue Date"].day,
 maturity_date = ql.Date(29, 7, 2027)
 day_counter = ql.Thirty360(ql.Thirty360.BondBasis)
 eval_date = ql.Settings.instance().evaluationDate
+coupon_date = ql.Date(29, 1, 2025)
 
 # -----------------
 # 2. build schedule
 # ------------------
 
 schedule = ql.Schedule(
-    max(issue_date, eval_date), maturity_date,
+    max(issue_date, coupon_date), maturity_date,
     ql.Period(frequency),
     calendar,
     convention, convention,
