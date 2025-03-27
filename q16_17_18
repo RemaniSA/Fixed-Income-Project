@@ -102,7 +102,7 @@ marginal_VaRs = {
     'cds': beta_cds * np.sqrt(var_cds) / std_total
 }
 
-component_VaRs = {k: v * std_total * z_99 for k, v in marginal_VaRs.items()}
+component_VaRs = {k: v * VaR_exact for k, v in marginal_VaRs.items()}
 
 
 # === OUTPUT ===
@@ -111,11 +111,15 @@ print(f"Exact (Analytical) 99% VaR: {VaR_exact:.4f}")
 print(f"Monte Carlo 99% ES: {ES_mc:.4f}")
 print(f"Exact (Analytical) 99% ES: {ES_exact:.4f}")
 
+print("\nMarginal VaR contributions:")
+for factor in marginal_VaRs:
+    print(f"  {factor}: {marginal_VaRs[factor]:.6f}")
+
 print("\nComponent VaR contributions:")
 for factor in component_VaRs:
-    print(f"  {factor}: {component_VaRs[factor]:.4f}")
+    print(f"  {factor}: {component_VaRs[factor]:.6f}")
     
-print(f"Sum of component VaRs: {sum(component_VaRs.values()):.6f}")
+print(f"Sum of component VaRs: {-sum(component_VaRs.values()):.6f}")
 print(f"Exact Total VaR:       {VaR_exact:.6f}")
 
 # Plot

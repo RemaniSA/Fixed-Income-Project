@@ -1,3 +1,4 @@
+#%%
 import QuantLib as ql
 import numpy as np
 import pandas as pd
