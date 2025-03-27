@@ -203,3 +203,40 @@ print(f"Cap DV01 (central diff): {dv01_cap:.4f} per 1 bp")
 print(f"Floor DV01 (central diff): {dv01_floor:.4f} per 1 bp")
 
 # %%
+
+# --- Compute Credit Sensitivity for Cap and Floor Using Central Difference ---
+
+# Assumed base CDS spread and recovery rate for the issuer
+cds_spread = 0.004579  # 45.79 bps expressed as a decimal
+recovery_rate = 0.40   # 40%
+
+# Calculate the total time to maturity and an average time to cash flow
+T_total = day_counter.yearFraction(eval_date, maturity_date)
+T_avg = T_total / 2  # simple approximation for the average time to exposure
+
+# Define a simple function to compute CVA for an instrument given its risk-free NPV
+def compute_instrument_cva(npv, cds, recovery_rate, T_avg):
+    # Approximate default probability over the average exposure period
+    default_prob = 1 - np.exp(-cds * T_avg)
+    return npv * default_prob * (1 - recovery_rate)
+
+# Define the CDS spread bump: 1 bp = 0.0001
+cds_bump = 0.0001
+
+# Compute CVA for the cap with bumped CDS spreads
+cva_cap_up = compute_instrument_cva(npv_cap, cds_spread + cds_bump, recovery_rate, T_avg)
+cva_cap_down = compute_instrument_cva(npv_cap, cds_spread - cds_bump, recovery_rate, T_avg)
+
+# Compute CVA for the floor with bumped CDS spreads
+cva_floor_up = compute_instrument_cva(npv_floor, cds_spread + cds_bump, recovery_rate, T_avg)
+cva_floor_down = compute_instrument_cva(npv_floor, cds_spread - cds_bump, recovery_rate, T_avg)
+
+# Calculate credit sensitivity using central difference:
+# (CVA(bump_down) - CVA(bump_up)) / (2 * cds_bump)
+credit_sensitivity_cap = (cva_cap_down - cva_cap_up) / 2
+credit_sensitivity_floor = (cva_floor_down - cva_floor_up) / 2
+
+print(f"Cap Credit Sensitivity (per 1 bp CDS change): {credit_sensitivity_cap:.4f}")
+print(f"Floor Credit Sensitivity (per 1 bp CDS change): {credit_sensitivity_floor:.4f}")
+
+# %%
