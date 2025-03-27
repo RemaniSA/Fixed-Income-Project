@@ -170,6 +170,7 @@ def main():
         plt.tight_layout()
         plt.show()
     
-
+if __name__=='__main__':
+    main()
 df_prices.to_csv("bond_sensitivity_prices.csv") # Output the results for Q16-18
 #%%
