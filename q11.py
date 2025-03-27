@@ -25,7 +25,7 @@ def make_zero_curve(dates, shifted_rates, calendar, day_counter):
     return curve
 
 def compute_sensitivity():
-    """Compute shifted curves and bond price sensitivity summary."""
+    """Compute shifted curves and bond price sensitivity summary using manual forward rates."""
     # --- Setup ---
     spot_date = ql.Date(18, 11, 2024)
     ql.Settings.instance().evaluationDate = spot_date
@@ -37,7 +37,7 @@ def compute_sensitivity():
     base_curve = build_curves()["Log-Cubic"]
     eval_date = ql.Date(18, 11, 2024)
     end_date = calendar.advance(eval_date, ql.Period(60, ql.Years))
-    n_points = 100    # number of points on the curve
+    n_points = 100
     dates = [eval_date + ql.Period(int(i * (end_date.serialNumber() - eval_date.serialNumber()) / n_points), ql.Days)
              for i in range(n_points + 1)]
     date_labels = [d.ISO() for d in dates]
@@ -53,7 +53,7 @@ def compute_sensitivity():
         "Curvature +10bps": make_zero_curve(dates, apply_curvature_shift(base_rates, 0.001), calendar, day_counter_curve),
         "Curvature -10bps": make_zero_curve(dates, apply_curvature_shift(base_rates, -0.001), calendar, day_counter_curve),
     }
-    
+
     # --- Bond Characteristics ---
     frequency = ql.Quarterly
     notional = bond_characteristics["Nominal Value"]
@@ -74,10 +74,16 @@ def compute_sensitivity():
         ql.DateGeneration.Forward, False
     )
     
-    # --- Pricing Functions ---
+    # --- Manual forward rate from discount factors ---
     def get_forward_rate(start, end, curve):
         safe_start = max(start, spot_date)
-        return curve.forwardRate(safe_start, end, day_counter_curve, ql.Simple).rate() if safe_start < end else 0.0
+        if safe_start >= end:
+            return 0.0
+        df1 = curve.discount(safe_start)
+        df2 = curve.discount(end)
+        yf = day_counter_curve.yearFraction(safe_start, end)
+        fwd = (df1 / df2 - 1.0) / yf if yf > 0 else 0.0
+        return fwd
     
     def compute_gross_price(curve):
         cashflows = []
@@ -114,6 +120,7 @@ def compute_sensitivity():
                 return notional * rate * yf
         return 0.0
     
+    # --- Price summary ---
     price_summary = {}
     for label, curve in shifted_curves.items():
         gross = compute_gross_price(curve)
@@ -169,8 +176,9 @@ def main():
         plt.legend()
         plt.tight_layout()
         plt.show()
-    
-if __name__=='__main__':
+
+if __name__ == "__main__":
     main()
+
 df_prices.to_csv("bond_sensitivity_prices.csv") # Output the results for Q16-18
 #%%
