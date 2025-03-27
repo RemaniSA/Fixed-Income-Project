@@ -100,7 +100,7 @@ def load_rate_helpers(file_path, fixing_days=2):
 # ----------------------------
 
 def build_curves():
-    ROOT_PATH = os.path.dirname(__file__)
+    ROOT_PATH = os.path.dirname(__file__).replace('code','')
     market_data_file_path = os.path.join(ROOT_PATH, 'datasets', 'MarketData.xlsx')
     rate_helpers = load_rate_helpers(market_data_file_path)
 

@@ -150,7 +150,8 @@ def main():
     plt.title("Base Zero Rate Curve")
     plt.xlabel("Maturity Date")
     plt.ylabel("Zero Rate")
-    plt.xticks(rotation=45)
+    plt.xticks(date_labels[::5],rotation=45)
+    plt.grid(axis='y')
     plt.show()
     
     # Plot shifted curves for each shift type

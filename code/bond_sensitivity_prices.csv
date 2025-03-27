@@ -1,0 +1,8 @@
+,Gross Price,Accrued Interest,Clean Price
+Base,1000.608,1.3005,999.3075
+Parallel +10bps,1000.622,1.3489,999.273
+Parallel -10bps,1000.5797,1.2429,999.3369
+Slope +10bps,1000.5772,1.2432,999.334
+Slope -10bps,1000.6244,1.3486,999.2759
+Curvature +10bps,1000.6021,1.3033,999.2988
+Curvature -10bps,1000.5995,1.2885,999.311

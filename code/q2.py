@@ -13,7 +13,7 @@ from q1 import bond_characteristics  # we need cap, floor, notional, issue date
 # 0. file paths and bond details
 # ----------------------------
 
-ROOT_PATH = os.path.dirname(__file__)
+ROOT_PATH = os.path.dirname(__file__).replace('code','')
 euribor_rates_file_path = os.path.join(ROOT_PATH, 'datasets', 'HistoricalEuribor.csv')
 holidays_file_path = os.path.join(ROOT_PATH, 'datasets', 'Holidays.csv')
 

@@ -13,7 +13,7 @@ from q3 import build_curves
 # 0. setup and load curve
 # ----------------------------
 
-ROOT_PATH = os.path.dirname(__file__)
+ROOT_PATH = os.path.dirname(__file__).replace('code','')
 vol_path = os.path.join(ROOT_PATH, 'datasets', 'shifted_black_vols.csv')
 euribor_path = os.path.join(ROOT_PATH, 'datasets', 'HistoricalEuribor.csv')
 

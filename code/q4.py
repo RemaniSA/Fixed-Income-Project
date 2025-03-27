@@ -12,7 +12,7 @@ from q3 import build_curves
 # 0. setup paths and curve
 # ------------------
 
-ROOT_PATH = os.path.dirname(__file__)
+ROOT_PATH = os.path.dirname(__file__).replace('code','')
 df_curve = build_curves()["Log-Cubic"]
 
 # -----------------
