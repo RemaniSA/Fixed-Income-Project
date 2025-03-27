@@ -32,7 +32,7 @@ issue_date = ql.Date(bond_characteristics["Issue Date"].day,
                      bond_characteristics["Issue Date"].year)
 
 maturity_date = ql.Date(29, 7, 2027)
-day_counter = ql.Actual360()
+day_counter = ql.Thirty360(ql.Thirty360.BondBasis)
 eval_date = ql.Settings.instance().evaluationDate
 
 # -----------------
