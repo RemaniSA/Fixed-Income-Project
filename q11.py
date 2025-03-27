@@ -169,9 +169,6 @@ def main():
         plt.tight_layout()
         plt.show()
     
-    print("\n📊 Bond Price Sensitivity Summary:")
-    print(df_prices_local)
-    df_prices_local.to_csv("bond_sensitivity_prices.csv")
 
-if __name__ == "__main__":
-    main()
+df_prices.to_csv("bond_sensitivity_prices.csv") # Output the results for Q16-18
+#%%

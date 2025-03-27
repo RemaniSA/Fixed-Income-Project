@@ -89,7 +89,7 @@ std_total = np.sqrt(total_var)
 # Normal 99% quantile
 z_99 = norm.ppf(0.01)
 VaR_exact = -z_99 * std_total
-ES_exact = std_total * norm.pdf(z_99)*100
+ES_exact = std_total * norm.pdf(z_99) / 0.01
 
 
 # === QUESTION 18 ===
