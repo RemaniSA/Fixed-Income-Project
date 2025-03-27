@@ -7,7 +7,7 @@ import pandas as pd
 
 from q1 import bond_characteristics
 from q4 import df_best, df_worst  
-from q6 import df_variable_exposure
+from q6_14_15 import df_variable_exposure
 
 # Prepare coupon-only data (exclude redemption)
 def filter_coupon_only(df):

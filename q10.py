@@ -3,7 +3,7 @@ import numpy as np
 from scipy.optimize import brentq
 
 from q1 import bond_characteristics
-from q6 import compute_cva, df_variable_exposure
+from q6_14_15 import compute_cva, df_variable_exposure
 from q8 import model_clean_price
 
 # ----------------------------
