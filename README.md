@@ -63,7 +63,7 @@ Ensure that all market data files (`MarketData.xlsx`, `shifted_black_vols.csv`, 
 
 ## How to Run
 
-Open the relevant script in the `code/` folder (e.g., `Q4_FRN_pricing.py`) and run via your preferred Python IDE.
+Open the relevant script in the `code/` folder (e.g., `Q1.py`) and run via your preferred Python IDE.
 
 ## Authors
 
