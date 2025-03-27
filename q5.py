@@ -124,33 +124,34 @@ floor.setPricingEngine(make_engine(vol_floor))
 npv_cap = cap.NPV()
 npv_floor = floor.NPV()
 
-# ----------------------------
-# 5. results
-# ----------------------------
+if __name__=='__main__':
+    # ----------------------------
+    # 5. results
+    # ----------------------------
 
-print(f"cap leg NPV (short):  {-npv_cap:.4f}")
-print(f"floor leg NPV (long): {npv_floor:.4f}")
-print(f"net option value (floor - cap): {npv_floor - npv_cap:.4f}")
+    print(f"cap leg NPV (short):  {-npv_cap:.4f}")
+    print(f"floor leg NPV (long): {npv_floor:.4f}")
+    print(f"net option value (floor - cap): {npv_floor - npv_cap:.4f}")
 
-# ----------------------------
-# 6. plot volatility surface
-# ----------------------------
+    # ----------------------------
+    # 6. plot volatility surface
+    # ----------------------------
 
-maturities = vol_surface.index.values
-strikes = vol_surface.columns.values
-M, S = np.meshgrid(strikes, maturities)
-V = vol_surface.values
+    maturities = vol_surface.index.values
+    strikes = vol_surface.columns.values
+    M, S = np.meshgrid(strikes, maturities)
+    V = vol_surface.values
 
-fig = plt.figure(figsize=(10, 6))
-ax = fig.add_subplot(111, projection='3d')
-surf = ax.plot_surface(S, M, V, cmap='viridis', edgecolor='k', linewidth=0.3)
+    fig = plt.figure(figsize=(10, 6))
+    ax = fig.add_subplot(111, projection='3d')
+    surf = ax.plot_surface(S, M, V, cmap='viridis', edgecolor='k', linewidth=0.3)
 
-ax.set_title("Shifted Black Volatility Surface", fontsize=14)
-ax.set_xlabel("Strike (%)")
-ax.set_ylabel("Maturity (Years)")
-ax.set_zlabel("Implied Volatility")
+    ax.set_title("Shifted Black Volatility Surface", fontsize=14)
+    ax.set_xlabel("Strike (%)")
+    ax.set_ylabel("Maturity (Years)")
+    ax.set_zlabel("Implied Volatility")
 
-fig.colorbar(surf, shrink=0.5, aspect=10)
-plt.tight_layout()
-plt.show()
+    fig.colorbar(surf, shrink=0.5, aspect=10)
+    plt.tight_layout()
+    plt.show()
 # %%
