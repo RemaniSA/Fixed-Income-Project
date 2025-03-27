@@ -106,7 +106,7 @@ def main():
     print("worst case NPV (floor rate):", round(npv_worst, 4))
 
     # plot coupon comparison
-    labels = [end.to_date() for end in df_best["End Date"]]
+    labels = [end.to_date() for end in df_best["Start Date"]]
     x = np.arange(len(labels))
     width = 0.4
 
