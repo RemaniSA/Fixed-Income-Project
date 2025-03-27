@@ -155,3 +155,51 @@ if __name__=='__main__':
     plt.tight_layout()
     plt.show()
 # %%
+
+# --- Compute DV01 for Cap and Floor Using Central Difference ---
+
+# Define the bump amount: 1 basis point = 0.0001
+bump = 0.0001
+
+# Helper function to create a bumped yield curve by shifting each zero rate by 'bump'
+def bump_yield_curve(curve, bump):
+    dates = curve.dates()
+    day_counter = curve.dayCounter()
+    bumped_rates = [curve.zeroRate(d, day_counter, ql.Continuous).rate() + bump for d in dates]
+    bumped_curve = ql.ZeroCurve(dates, bumped_rates, day_counter, ql.TARGET())
+    bumped_curve.enableExtrapolation()
+    return bumped_curve
+
+# Create bumped curves for upward and downward shifts
+bumped_curve_up = bump_yield_curve(log_cubic_curve, bump)
+bumped_curve_down = bump_yield_curve(log_cubic_curve, -bump)
+
+# Helper to create a BlackCapFloorEngine with a specified yield curve
+def make_engine_with_curve(vol, curve):
+    return ql.BlackCapFloorEngine(
+        ql.YieldTermStructureHandle(curve),
+        ql.QuoteHandle(ql.SimpleQuote(vol)),
+        day_counter,
+        shift
+    )
+
+# Price the cap and floor with the upward-shifted curve
+cap.setPricingEngine(make_engine_with_curve(vol_cap, bumped_curve_up))
+floor.setPricingEngine(make_engine_with_curve(vol_floor, bumped_curve_up))
+npv_cap_up = cap.NPV()
+npv_floor_up = floor.NPV()
+
+# Price the cap and floor with the downward-shifted curve
+cap.setPricingEngine(make_engine_with_curve(vol_cap, bumped_curve_down))
+floor.setPricingEngine(make_engine_with_curve(vol_floor, bumped_curve_down))
+npv_cap_down = cap.NPV()
+npv_floor_down = floor.NPV()
+
+# Compute DV01 using central difference: (NPV(bump_down) - NPV(bump_up)) / (2 * bump)
+dv01_cap = (npv_cap_down - npv_cap_up) / 2
+dv01_floor = (npv_floor_down - npv_floor_up) / 2
+
+print(f"Cap DV01 (central diff): {dv01_cap:.4f} per 1 bp")
+print(f"Floor DV01 (central diff): {dv01_floor:.4f} per 1 bp")
+
+# %%
