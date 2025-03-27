@@ -27,7 +27,7 @@ def make_zero_curve(dates, shifted_rates, calendar, day_counter):
 def compute_sensitivity():
     """Compute shifted curves and bond price sensitivity summary."""
     # --- Setup ---
-    spot_date = ql.Date(26, 11, 2024)
+    spot_date = ql.Date(18, 11, 2024)
     ql.Settings.instance().evaluationDate = spot_date
     calendar = ql.TARGET()
     day_counter_curve = ql.Actual360()
