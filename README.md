@@ -8,7 +8,7 @@ Structured interest rate products present a number of technical challenges: from
 
 ## My Reflections
 
-This was the most intellectually demanding project I undertook during my MSc. What struck me most was the sheer volume of work required before you can even arrive at a clean price: selecting the right curve, calibrating a model, dealing with accrued interest, adjusting for credit risk via CVA, computing DV01, and constructing a hedging strategy with swaps and CDS. Equity pricing suddenly felt straightforward in comparison. I also took the initiative to move our team from Excel to QuantLib, which offered far greater flexibility in curve construction and pricing logic. I taught myself the library in a week while building the deliverables; a steep but rewarding learning curve. This project deepened my appreciation for the complexity and elegance of fixed income modelling.
+This was the most intellectually demanding project I undertook during my MSc. What struck me most was the sheer volume of work required before you can even arrive at a clean price: selecting the right curve, calibrating a model, dealing with accrued interest, adjusting for credit risk via CVA, computing DV01, and constructing a hedging strategy with swaps and CDS. Equity pricing suddenly felt straightforward in comparison. I also took the initiative to move our team from Excel to QuantLib, which offered far greater flexibility in curve construction and pricing logic. I taught myself the library in a week while building the deliverables; a steep but rewarding learning 'curve'. This project deepened my appreciation for the complexity and elegance of fixed income modelling.
 
 ## Methods
 
